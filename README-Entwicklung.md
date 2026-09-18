@@ -80,11 +80,10 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
 
 ## Noch zu tun
 1. Admin-Zustimmung für die App einholen (Mail an den M365-Admin; Text siehe Chat).
-2. GitHub-Repo `planner-ablage` (public, Pages aus `docs/`) anlegen und pushen. Der
-   Sicherheitsfilter von Claude Code blockt `gh repo create` → der Nutzer führt es selbst aus:
-   `gh repo create ingmoedl/planner-ablage --public --source . --remote origin --push`
-   und danach `gh api -X POST repos/ingmoedl/planner-ablage/pages -f "source[branch]=main" -f "source[path]=/docs"`.
-3. Dev-Eintrag `PageUrl` in settings.json wieder entfernen (Standard = Pages-URL).
+2. ✅ GitHub-Repo https://github.com/ingmoedl/planner-ablage (public) angelegt 18.09.2026, Pages aus
+   `docs/` → https://ingmoedl.github.io/planner-ablage/index.html. Deployment wie beim Knopf:
+   Cache-Buster in `docs/index.html` erhöhen, `git add -A`, commit, `git push origin main`, 30–90 s warten.
+3. ✅ settings.json `PageUrl` zeigt auf die Pages-URL (Standard).
 4. Echttests: Anmeldung, 620 Pläne, Upload klein/groß, Referenz sichtbar, Drag aus klassischem
    Outlook (virtuelle .msg), Drag aus neuem Outlook (erwartet: Hinweis).
 5. Skill „planner-ablage-installation" analog zum Knopf-Skill.
