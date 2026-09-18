@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aufgabe in Planner</title>
+  <script src="msal-browser.min.js?v=2"></script>
+  <style>
+    :root {
+      --ink: #242424; --muted: #616161; --line: #d1d1d1;
+      --accent: #185c37; --accent-hov: #0f4a2a;
+      --bg: #ffffff; --field: #ffffff; --soft: #f5f5f5;
+      --err: #b10e1c; --ok: #107c10;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; padding: 14px 16px 18px; font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; color: var(--ink); background: var(--bg); }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; }
+    input[type=text], input[type=date], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; font: inherit; background: var(--field); color: var(--ink); }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    textarea { resize: vertical; min-height: 66px; line-height: 1.4; }
+    .row2 { display: flex; gap: 10px; }
+    .row2 > div { flex: 1; min-width: 0; }
+    select:disabled { color: var(--muted); }
+    #bucketRow { display: none; }
+    .combobox { position: relative; }
+    .droplist { position: absolute; left: 0; right: 0; top: 100%; z-index: 10; max-height: 200px; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.15); display: none; }
+    .droplist div { padding: 7px 10px; cursor: pointer; }
+    .droplist div:hover, .droplist div.active { background: var(--soft); }
+    .droplist .none { color: var(--muted); cursor: default; }
+    .buttons { display: flex; gap: 10px; margin-top: 16px; }
+    button.primary { flex: 1; padding: 9px; background: var(--accent); color: #fff; border: none; border-radius: 4px; font: inherit; font-weight: 600; cursor: pointer; }
+    button.primary:hover { background: var(--accent-hov); }
+    button.primary:disabled { background: #9aa8a0; cursor: default; }
+    button.secondary { padding: 9px 14px; background: var(--soft); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; font: inherit; cursor: pointer; }
+    button.secondary:hover { background: #ebebeb; }
+    #status { margin-top: 14px; font-size: 13px; line-height: 1.5; }
+    #status.err { color: var(--err); }
+    #status.ok { color: var(--ok); }
+    #status a { color: var(--accent); font-weight: 600; }
+    .hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+    #detected { font-size: 11.5px; margin-top: 3px; color: var(--muted); }
+    #detected b { color: var(--accent); }
+    #login { display: none; margin-top: 8px; }
+    #login button { width: 100%; }
+
+    /* Anlagen */
+    #dropzone { border: 2px dashed var(--line); border-radius: 8px; padding: 14px; text-align: center; color: var(--muted); font-size: 12.5px; background: var(--soft); margin-top: 4px; }
+    #dropzone.over { border-color: var(--accent); background: #e8f2ec; color: var(--accent); }
+    #dropzone.hasfiles { padding: 8px 10px; text-align: left; border-style: solid; }
+    #files { list-style: none; margin: 0; padding: 0; }
+    #files li { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: var(--ink); }
+    #files li .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #files li .size { color: var(--muted); font-size: 11.5px; }
+    #files li .rm { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+    #files li .rm:hover { color: var(--err); }
+    #dropmore { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+    #progress { height: 4px; background: var(--soft); border-radius: 2px; overflow: hidden; margin-top: 10px; display: none; }
+    #progress div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  </style>
+</head>
+<body>
+  <h1>Aufgabe in Planner erstellen</h1>
+
+  <div id="login">
+    <button id="loginBtn" class="primary">Bei Microsoft anmelden</button>
+    <div class="hint">Nur beim ersten Mal nötig — danach startet die Ablage künftig ohne Nachfrage.</div>
+  </div>
+
+  <div id="form">
+    <label>Anlage</label>
+    <div id="dropzone">
+      <div id="dropempty">Datei hierher ziehen oder auf den Punkt legen.<br>Die Datei wird im Jahres-Team des Projekts abgelegt und an die Aufgabe gehängt.</div>
+      <ul id="files"></ul>
+      <div id="dropmore" style="display:none">Weitere Dateien einfach dazu ziehen.</div>
+    </div>
+
+    <label for="plan">Projekt / Plan</label>
+    <div class="combobox">
+      <input type="text" id="plan" placeholder="Pläne werden geladen …" autocomplete="off" />
+      <div id="planlist" class="droplist"></div>
+    </div>
+    <div id="detected"></div>
+    <div id="planinfo" class="hint"></div>
+
+    <div id="bucketRow">
+      <label for="bucket">Bucket</label>
+      <select id="bucket"></select>
+    </div>
+
+    <label for="title">Titel der Aufgabe</label>
+    <input type="text" id="title" autocomplete="off" />
+
+    <label for="assign">Zuweisen an</label>
+    <div class="combobox">
+      <input type="text" id="assign" placeholder="Name tippen …" autocomplete="off" />
+      <div id="assignlist" class="droplist"></div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label for="start">Start (optional)</label>
+        <input type="date" id="start" />
+      </div>
+      <div>
+        <label for="due">Ende / fällig am (optional)</label>
+        <input type="date" id="due" />
+      </div>
+    </div>
+
+    <label for="notes">Notizen (optional)</label>
+    <textarea id="notes" rows="3" placeholder="Was ist zu tun? Diese Notizen werden zur Aufgabenbeschreibung. Die Datei hängt als Anlage an der Aufgabe."></textarea>
+
+    <div id="progress"><div></div></div>
+    <div class="buttons">
+      <button id="cancel" class="secondary" style="display:none">Abbrechen</button>
+      <button id="create" class="primary">Aufgabe erstellen</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="version" class="hint" style="margin-top: 18px; text-align: right;"></div>
+
+  <script src="app.js?v=4"></script>
+</body>
+</html>
