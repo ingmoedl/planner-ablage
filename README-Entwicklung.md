@@ -70,12 +70,20 @@ Getestet am 18.09.2026 auf dem PC des Nutzers: Punkt rund, verschiebbar, Formula
 dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), Abbrechen schließt.
 **Nicht getestet** (braucht App-Registrierung): Anmeldung, Planliste, Upload, Aufgabe.
 
+## Entra-App „Planner-Ablage" (angelegt 18.09.2026 im Browser durch Claude, Konto moedl@)
+- Client-ID `239b6012-5d61-4e37-9041-75b0218e6a09`, Tenant `1571141a-75a9-43a3-ad47-8d613cfbb3e6`,
+  Objekt-ID `dbccf354-969b-43c3-93b4-154529edd44d`, „Nur ein Mandant".
+- SPA-Redirect: `https://ingmoedl.github.io/planner-ablage/index.html`.
+- Delegierte Berechtigungen (konfiguriert, **Admin-Zustimmung steht aus**): User.Read,
+  User.ReadBasic.All, Tasks.ReadWrite, Files.ReadWrite.All. Als Nicht-Admin gibt es keinen
+  Knopf „Administratoreinwilligung erteilen"; beim ersten Login erscheint der Anfrage-Dialog.
+
 ## Noch zu tun
-1. App-Registrierung „Planner-Ablage" in Entra (SPA-Redirect
-   `https://ingmoedl.github.io/planner-ablage/index.html`, die vier Scopes), Admin-Zustimmung.
-   Danach `CONFIG.clientId` eintragen.
-2. GitHub-Repo `planner-ablage` (public, Pages aus `docs/`) anlegen und pushen –
-   erst nach Freigabe durch den Nutzer.
+1. Admin-Zustimmung für die App einholen (Mail an den M365-Admin; Text siehe Chat).
+2. GitHub-Repo `planner-ablage` (public, Pages aus `docs/`) anlegen und pushen. Der
+   Sicherheitsfilter von Claude Code blockt `gh repo create` → der Nutzer führt es selbst aus:
+   `gh repo create ingmoedl/planner-ablage --public --source . --remote origin --push`
+   und danach `gh api -X POST repos/ingmoedl/planner-ablage/pages -f "source[branch]=main" -f "source[path]=/docs"`.
 3. Dev-Eintrag `PageUrl` in settings.json wieder entfernen (Standard = Pages-URL).
 4. Echttests: Anmeldung, 620 Pläne, Upload klein/groß, Referenz sichtbar, Drag aus klassischem
    Outlook (virtuelle .msg), Drag aus neuem Outlook (erwartet: Hinweis).
