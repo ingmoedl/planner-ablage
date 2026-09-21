@@ -32,7 +32,7 @@ namespace PlannerAblage
 
     static class App
     {
-        public const string Version = "0.2";
+        public const string Version = "0.3";
         public const string InstallCommand = "irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex";
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
         public static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PlannerAblage");
@@ -488,6 +488,8 @@ namespace PlannerAblage
                     if (!e.IsSuccess) { status.Text = "Seite konnte nicht geladen werden (" + e.WebErrorStatus + ").\n" + App.Cfg.PageUrl; status.Visible = true; wv.Visible = false; }
                     else { status.Visible = false; wv.Visible = true; }
                 };
+                // Zeitstempel anhängen, damit WebView2 nie eine veraltete index.html aus dem Cache nimmt
+                if (url.StartsWith("http")) url += (url.Contains("?") ? "&" : "?") + "t=" + DateTime.UtcNow.Ticks;
                 core.Navigate(url);
             }
             catch (Exception ex)

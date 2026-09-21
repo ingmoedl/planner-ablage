@@ -124,6 +124,7 @@ function wireHost() {
 }
 
 function hostPost(obj) { if (inHost) window.chrome.webview.postMessage(obj); }
+function diag(text) { console.log("[PA] " + text); hostPost({ type: "log", text: text }); }
 
 async function verifyFile(f) {
   try {
@@ -588,7 +589,9 @@ async function uploadFile(groupId, folderPath, file, onProgress) {
     const res = await graph(base + ":/content?@microsoft.graph.conflictBehavior=rename", { method: "PUT", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
     if (!res.ok) throw new Error(await uploadError(res, file.name));
     onProgress(1);
-    return await res.json();
+    const item = await res.json();
+    diag("Upload ok: " + (item && item.name) + " → " + (item && item.webUrl));
+    return item;
   }
   // Große Datei: Upload-Session in Blöcken
   const sess = await graph(base + ":/createUploadSession", { method: "POST", body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "rename", name: file.name } }) });
@@ -674,6 +677,7 @@ async function createTask() {
       showStatus("Ablageordner wird gesucht …", "");
       const folder = await findProjectFolder(selectedPlan.owner, selectedPlan.title);
       let folderPath = folder ? folder.name : "";
+      diag("Plan " + selectedPlan.title + " | Gruppe " + selectedPlan.owner + " | Ordner " + (folderPath || "(Wurzel)"));
       if (CONFIG.uploadSubfolder) folderPath = (folderPath ? folderPath + "/" : "") + CONFIG.uploadSubfolder;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
@@ -753,7 +757,9 @@ async function patchDetails(taskId, description, refs, tries) {
         };
       });
     }
+    diag("PATCH details: " + JSON.stringify(patch).slice(0, 1500));
     const res = await graph("/planner/tasks/" + taskId + "/details", { method: "PATCH", headers: { "If-Match": etag }, body: JSON.stringify(patch) });
+    diag("PATCH Antwort: " + res.status);
     if (res.ok) return;
     let detail = ""; try { const j = await res.json(); detail = (j.error && j.error.message) || ""; } catch (_) {}
     lastErr = "Graph " + res.status + (detail ? ": " + detail : "");
