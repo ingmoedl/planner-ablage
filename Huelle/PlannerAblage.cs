@@ -32,7 +32,7 @@ namespace PlannerAblage
 
     static class App
     {
-        public const string Version = "0.3";
+        public const string Version = "0.4";
         public const string InstallCommand = "irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex";
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
         public static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PlannerAblage");
@@ -42,6 +42,18 @@ namespace PlannerAblage
         [STAThread]
         static void Main(string[] args)
         {
+            if (IsElevated() && Array.IndexOf(args, "--keep-elevated") < 0)
+            {
+                // Erhöhte Prozesse bekommen keine Drops aus dem (nicht erhöhten) Explorer → rotes Verbotszeichen.
+                // explorer.exe startet die exe mit normalen Benutzerrechten.
+                try
+                {
+                    Log("Erhöht gestartet – Neustart mit normalen Rechten über explorer.exe");
+                    Process.Start("explorer.exe", "\"" + Application.ExecutablePath + "\"");
+                    return;
+                }
+                catch (Exception e) { Log("De-Elevation fehlgeschlagen: " + e.Message); }
+            }
             bool created;
             using (var mutex = new Mutex(true, "Local\\PlannerAblage_Punkt", out created))
             {
@@ -63,6 +75,16 @@ namespace PlannerAblage
                 Application.Run(new DropForm(testFiles));
                 GC.KeepAlive(mutex);
             }
+        }
+
+        static bool IsElevated()
+        {
+            try
+            {
+                using (var id = System.Security.Principal.WindowsIdentity.GetCurrent())
+                    return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+            catch (Exception) { return false; }
         }
 
         public static void Log(string text)
@@ -376,7 +398,11 @@ namespace PlannerAblage
         {
             base.OnDragEnter(e);
             if (Dropped.HasFiles(e.Data)) { e.Effect = DragDropEffects.Copy; dragOver = true; Invalidate(); }
-            else e.Effect = DragDropEffects.None;
+            else
+            {
+                e.Effect = DragDropEffects.None;
+                try { App.Log("Drag abgelehnt, Formate: " + string.Join(", ", e.Data.GetFormats())); } catch (Exception) { }
+            }
         }
 
         protected override void OnDragLeave(EventArgs e) { base.OnDragLeave(e); dragOver = false; Invalidate(); }
@@ -574,7 +600,8 @@ namespace PlannerAblage
     {
         public static bool HasFiles(System.Windows.Forms.IDataObject data)
         {
-            return data.GetDataPresent(DataFormats.FileDrop) || data.GetDataPresent("FileGroupDescriptorW");
+            return data.GetDataPresent(DataFormats.FileDrop) || data.GetDataPresent("FileGroupDescriptorW")
+                || data.GetDataPresent("FileGroupDescriptor") || data.GetDataPresent("Shell IDList Array");
         }
 
         public static List<DroppedFile> Extract(System.Windows.Forms.IDataObject data, string dir)
