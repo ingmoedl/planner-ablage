@@ -36,5 +36,6 @@ if "%BUILD%"=="1" (
 )
 
 rem Falls schon ein Punkt laeuft, beendet sich der zweite Start von selbst.
-start "" "%EXE%"
+rem Bei stiller Installation (install.ps1) startet das Skript den Punkt selbst.
+if not defined PA_STILL start "" "%EXE%"
 exit /b 0

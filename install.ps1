@@ -50,6 +50,9 @@ $code = $LASTEXITCODE
 Pop-Location
 if ($code -ne 0) { throw "Einrichten fehlgeschlagen (Code $code). Protokoll: $root\log.txt" }
 
+# Punkt starten – losgelöst von diesem Fenster, damit das Skript sofort zurückkehrt
+Start-Process -FilePath (Join-Path $appDir "bin\PlannerAblage.exe") -WorkingDirectory (Join-Path $appDir "bin")
+
 Write-Host ""
 Write-Host "  Fertig. Der grüne Punkt ist unten rechts auf dem Hauptbildschirm." -ForegroundColor Green
 Write-Host "  Datei darauf ziehen -> Aufgabe in Planner. Rechtsklick zeigt die Optionen."
