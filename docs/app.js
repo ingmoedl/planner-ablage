@@ -706,12 +706,17 @@ async function createTask() {
     if (end) description = "Geplantes Ende: " + fmtDate(end) + (description ? "\n\n" + description : "");
     if (skipped.length) description = (description ? description + "\n\n" : "") + "Datei(en): " + skipped.join(", ");
     const refs = uploaded.filter((u) => u.webUrl);
-    if (description || refs.length) await patchDetails(task.id, description, refs, 2);
+    let detailsError = "";
+    if (description || refs.length) {
+      try { await patchDetails(task.id, description, refs, 3); }
+      catch (e) { detailsError = msg(e); }
+    }
 
     const bucketName = bucketId ? (buckets.find((b) => b.id === bucketId) || {}).name : "";
     const link = CONFIG.plannerWeb + planId + "/view/board/task/" + task.id;
     let html = '✓ Aufgabe angelegt in „' + esc(selectedPlan.title) + '"' + (bucketName ? " → Bucket „" + esc(bucketName) + '"' : "") + ".";
-    if (refs.length) html += "<br>" + refs.length + (refs.length === 1 ? " Datei" : " Dateien") + " im Team abgelegt und angehängt.";
+    if (refs.length && !detailsError) html += "<br>" + refs.length + (refs.length === 1 ? " Datei" : " Dateien") + " im Team abgelegt und angehängt.";
+    if (detailsError) html += '<br><span style="color:var(--err)">⚠ ' + esc(detailsError) + "</span>";
     if (skipped.length) html += "<br>Ohne Upload (Testmodus): " + esc(skipped.join(", "));
     html += '<br><a href="' + link + '" target="_blank" rel="noopener">In Planner öffnen</a>';
     showStatus(html, "ok");
@@ -729,27 +734,33 @@ async function createTask() {
 }
 
 async function patchDetails(taskId, description, refs, tries) {
+  let lastErr = "";
   for (let i = 0; i < tries; i++) {
     const det = await graph("/planner/tasks/" + taskId + "/details");
-    if (!det.ok) return;
+    if (!det.ok) { lastErr = "Details lesen: Graph " + det.status; continue; }
     const etag = (await det.json())["@odata.etag"];
     const patch = {};
     if (description) patch.description = description;
     if (refs.length) {
       patch.previewType = "reference"; // Karte im Planner-Board zeigt die Anlage
       patch.references = {};
-      refs.forEach((r, k) => {
+      refs.forEach((r) => {
         patch.references[encodeRefKey(r.webUrl)] = {
           "@odata.type": "#microsoft.graph.plannerExternalReference",
           alias: r.name.slice(0, 250),
           type: refType(r.name),
-          previewPriority: " !" + String.fromCharCode(33 + k),
+          previewPriority: " !",   // gültiger orderHint (Planner sortiert selbst); " !x" wäre ungültig → 400
         };
       });
     }
     const res = await graph("/planner/tasks/" + taskId + "/details", { method: "PATCH", headers: { "If-Match": etag }, body: JSON.stringify(patch) });
-    if (res.ok || (res.status !== 409 && res.status !== 412)) return;
+    if (res.ok) return;
+    let detail = ""; try { const j = await res.json(); detail = (j.error && j.error.message) || ""; } catch (_) {}
+    lastErr = "Graph " + res.status + (detail ? ": " + detail : "");
+    hostPost({ type: "log", text: "patchDetails fehlgeschlagen: " + lastErr });
+    if (res.status !== 409 && res.status !== 412) break; // nur bei ETag-Konflikt erneut versuchen
   }
+  throw new Error("Aufgabe wurde angelegt, aber Beschreibung/Anlage konnten nicht gesetzt werden (" + lastErr + ").");
 }
 
 /* Planner-Referenz-Keys: % zuerst, dann . : @ # encodieren */
