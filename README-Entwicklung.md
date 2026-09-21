@@ -81,6 +81,9 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
 - Drei Datumsfelder Start / Ende / Fällig am: Start → `startDateTime`, Fällig → `dueDateTime`,
   Ende → erste Zeile der Beschreibung „Geplantes Ende: TT.MM.JJJJ" (Planner kennt kein drittes Datum).
 - Anlagen: `previewType: "reference"` in den Details, damit die Karte im Board die Anlage zeigt.
+  **Falle (21.09.):** `previewPriority` muss ein gültiger orderHint sein (`" !"`); `" !" + Zeichen` ist ungültig →
+  Graph 400 beim PATCH, und `patchDetails` hatte das still verschluckt → Aufgabe ohne Anlage. Seit app.js v=6
+  wirft `patchDetails` einen Fehler, der im Statustext erscheint (Aufgabe bleibt bestehen) und ins log.txt geht.
 - Autostart wird beim allerersten Start (keine settings.json) automatisch gesetzt.
 - Doppelklick: eigene Erkennung in `OnMouseUp` (zwei Klicks ohne Bewegung innerhalb
   `SystemInformation.DoubleClickTime`), weil der WinForms-Doppelklick auf dem rahmenlosen Form
