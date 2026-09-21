@@ -32,7 +32,8 @@ namespace PlannerAblage
 
     static class App
     {
-        public const string Version = "0.1";
+        public const string Version = "0.2";
+        public const string InstallCommand = "irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex";
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
         public static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PlannerAblage");
         public static readonly string LocalDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PlannerAblage");
@@ -49,7 +50,9 @@ namespace PlannerAblage
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 try { Directory.CreateDirectory(DataDir); Directory.CreateDirectory(LocalDir); } catch (Exception) { }
+                bool firstRun = !File.Exists(Path.Combine(DataDir, "settings.json"));
                 Cfg = Settings.Load();
+                if (firstRun && !Autostart.IsEnabled()) Autostart.Set(true); // ab dem ersten Start mit Windows starten
                 Application.ThreadException += delegate(object s, ThreadExceptionEventArgs e)
                 {
                     MessageBox.Show("Unerwarteter Fehler:\n\n" + e.Exception.Message, "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -223,6 +226,17 @@ namespace PlannerAblage
             miAutostart.CheckedChanged += delegate { Autostart.Set(miAutostart.Checked); miAutostart.Checked = Autostart.IsEnabled(); };
             menu.Items.Add(miAutostart);
 
+            var miUpdate = new ToolStripMenuItem("Aktualisieren (neueste Version holen)");
+            miUpdate.Click += delegate
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"" + App.InstallCommand + "\"") { UseShellExecute = true });
+                }
+                catch (Exception ex) { MessageBox.Show("Aktualisierung konnte nicht gestartet werden:\n" + ex.Message, "Planner-Ablage"); }
+            };
+            menu.Items.Add(miUpdate);
+
             var miLog = new ToolStripMenuItem("Protokoll-Ordner öffnen");
             miLog.Click += delegate { try { Process.Start("explorer.exe", App.LocalDir); } catch (Exception) { } };
             menu.Items.Add(miLog);
@@ -316,14 +330,23 @@ namespace PlannerAblage
             if (e.Button == MouseButtons.Left && moving)
             {
                 moving = false;
-                if (moved) SavePosition();
+                if (moved) { SavePosition(); lastClick = DateTime.MinValue; return; }
+                // Eigene Doppelklick-Erkennung: zwei Klicks ohne Bewegung innerhalb der Windows-Doppelklickzeit
+                var now = DateTime.Now;
+                if ((now - lastClick).TotalMilliseconds <= SystemInformation.DoubleClickTime)
+                {
+                    lastClick = DateTime.MinValue;
+                    OpenTask(new List<DroppedFile>());
+                }
+                else lastClick = now;
             }
         }
+        DateTime lastClick = DateTime.MinValue;
 
         protected override void OnMouseDoubleClick(MouseEventArgs e)
         {
             base.OnMouseDoubleClick(e);
-            if (e.Button == MouseButtons.Left) OpenTask(new List<DroppedFile>());
+            // wird zusätzlich von OnMouseUp abgedeckt; hier nur, falls Windows den Doppelklick direkt meldet
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)

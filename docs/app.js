@@ -8,7 +8,7 @@
 "use strict";
 
 const CONFIG = {
-  version: "0.1",
+  version: "0.2",
   // App-Registrierung "Planner-Ablage" (eigene App, NICHT der Planner-Knopf), angelegt 18.09.2026.
   // ?client=<id>&scopes=knopf erlaubt Zwischentests mit einer anderen App.
   clientId: "239b6012-5d61-4e37-9041-75b0218e6a09",
@@ -639,8 +639,9 @@ async function createTask() {
   if (!selectedPlan) { showStatus("Bitte zuerst einen Plan auswählen (Feld 'Projekt / Plan').", "err"); el("plan").focus(); return; }
   const title = el("title").value.trim();
   if (!title) { showStatus("Bitte einen Titel eingeben.", "err"); el("title").focus(); return; }
-  const start = el("start").value, due = el("due").value;
-  if (start && due && start > due) { showStatus("Das Startdatum liegt nach dem Enddatum. Bitte Termine prüfen.", "err"); el("start").focus(); return; }
+  const start = el("start").value, end = el("end").value, due = el("due").value;
+  if (start && end && start > end) { showStatus("Das Startdatum liegt nach dem Ende. Bitte Termine prüfen.", "err"); el("start").focus(); return; }
+  if (start && due && start > due) { showStatus("Das Startdatum liegt nach dem Fälligkeitsdatum. Bitte Termine prüfen.", "err"); el("start").focus(); return; }
   const notes = el("notes").value.trim();
   const btn = el("create");
   if (files.some((f) => !f.ready || f.ok === null)) {
@@ -700,7 +701,9 @@ async function createTask() {
     if (bucketId) { try { localStorage.setItem(CONFIG.lastBucketPrefix + planId, bucketId); } catch (_) {} }
 
     // 3) Beschreibung + Anlagen (Referenzen) an die Aufgabe
+    // Planner kennt nur Start und Fälligkeit; das geplante Ende wird als Zeile in die Beschreibung geschrieben.
     let description = notes;
+    if (end) description = "Geplantes Ende: " + fmtDate(end) + (description ? "\n\n" + description : "");
     if (skipped.length) description = (description ? description + "\n\n" : "") + "Datei(en): " + skipped.join(", ");
     const refs = uploaded.filter((u) => u.webUrl);
     if (description || refs.length) await patchDetails(task.id, description, refs, 2);
@@ -716,7 +719,7 @@ async function createTask() {
     hostPost({ type: "done", taskId: task.id });
     // Formular für die nächste Aufgabe leeren, Fenster bleibt offen bis der Nutzer es schließt
     files = []; renderFiles();
-    el("title").value = ""; el("notes").value = ""; el("start").value = ""; el("due").value = "";
+    el("title").value = ""; el("notes").value = ""; el("start").value = ""; el("end").value = ""; el("due").value = "";
     if (inHost) { el("cancel").textContent = "Schließen"; }
   } catch (e) {
     showStatus(friendlyAuthError(e), "err");
@@ -733,6 +736,7 @@ async function patchDetails(taskId, description, refs, tries) {
     const patch = {};
     if (description) patch.description = description;
     if (refs.length) {
+      patch.previewType = "reference"; // Karte im Planner-Board zeigt die Anlage
       patch.references = {};
       refs.forEach((r, k) => {
         patch.references[encodeRefKey(r.webUrl)] = {
@@ -765,6 +769,8 @@ function friendlyAuthError(e) {
   if (/AADSTS50011|redirect/i.test(m)) return "Die Rücksprungadresse dieser Seite ist in der App-Registrierung nicht eingetragen. (" + esc(m) + ")";
   return "Fehler: " + esc(m);
 }
+
+function fmtDate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? m[3] + "." + m[2] + "." + m[1] : iso; }
 
 function fmtSize(n) {
   if (!n && n !== 0) return "";

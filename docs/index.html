@@ -20,8 +20,9 @@
     input[type=text], input[type=date], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; font: inherit; background: var(--field); color: var(--ink); }
     input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
     textarea { resize: vertical; min-height: 66px; line-height: 1.4; }
-    .row2 { display: flex; gap: 10px; }
+    .row2 { display: flex; gap: 8px; }
     .row2 > div { flex: 1; min-width: 0; }
+    .row2 input[type=date] { padding-left: 6px; padding-right: 4px; font-size: 13px; }
     select:disabled { color: var(--muted); }
     #bucketRow { display: none; }
     .combobox { position: relative; }
@@ -100,14 +101,19 @@
 
     <div class="row2">
       <div>
-        <label for="start">Start (optional)</label>
+        <label for="start">Start</label>
         <input type="date" id="start" />
       </div>
       <div>
-        <label for="due">Ende / fällig am (optional)</label>
+        <label for="end">Ende</label>
+        <input type="date" id="end" />
+      </div>
+      <div>
+        <label for="due">Fällig am</label>
         <input type="date" id="due" />
       </div>
     </div>
+    <div class="hint">Alle Termine optional. Start und Fällig am zeigt Planner auf der Karte; das Ende steht in der Beschreibung.</div>
 
     <label for="notes">Notizen (optional)</label>
     <textarea id="notes" rows="3" placeholder="Was ist zu tun? Diese Notizen werden zur Aufgabenbeschreibung. Die Datei hängt als Anlage an der Aufgabe."></textarea>
@@ -122,6 +128,6 @@
   <div id="status"></div>
   <div id="version" class="hint" style="margin-top: 18px; text-align: right;"></div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

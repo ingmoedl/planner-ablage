@@ -2,23 +2,31 @@ Planner-Ablage  (ing Burghausen GmbH, Samuel Moedl)
 ====================================================
 
 Ein kleiner gruener Punkt auf dem Bildschirm. Datei darauf ziehen, daneben oeffnet sich
-"Aufgabe in Planner": Projekt, Bucket, Titel, Zuweisen, Start, Ende, Notizen. Die Datei
-wird im richtigen Jahres-Team abgelegt und haengt als Anlage an der Aufgabe. Das Original
-bleibt, wo es war.
+"Aufgabe in Planner": Projekt, Bucket, Titel, Zuweisen, Start, Ende, Faellig am, Notizen.
+Die Datei wird im richtigen Jahres-Team abgelegt und haengt als Anlage an der Aufgabe.
+Das Original bleibt, wo es war.
 
-Einrichten (einmalig, kein Admin, ca. 1 Minute)
-------------------------------------------------
-1. Diesen Ordner irgendwohin kopieren, wo er bleiben kann (z. B. C:\Users\<Name>\Planner-Ablage).
-2. Doppelklick auf  Installieren.cmd
-3. Beim ersten Ablegen einer Datei einmal mit dem Firmenkonto bei Microsoft anmelden.
+Installieren (einmalig, kein Admin, ca. 1 Minute)
+--------------------------------------------------
+Windows-Taste druecken, "PowerShell" tippen, Enter. Dann diese Zeile einfuegen und Enter:
+
+    irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex
+
+Das laedt den aktuellen Stand, richtet alles unter %LOCALAPPDATA%\PlannerAblage ein und
+startet den Punkt. Er startet ab dann automatisch mit Windows.
+Beim ersten Ablegen einer Datei einmal mit dem Firmenkonto bei Microsoft anmelden.
+
+Alternativ ohne Internet-Befehl: diesen Ordner irgendwohin kopieren und Installieren.cmd
+doppelklicken.
 
 Bedienung
 ---------
-- Datei auf den Punkt ziehen        -> Formular oeffnet sich
+- Datei auf den Punkt ziehen        -> Formular oeffnet sich sofort, Datei wird im Hintergrund uebernommen
+- Doppelklick auf den Punkt         -> Formular ohne Datei (Aufgabe ohne Anlage)
 - Punkt mit gedrueckter Maustaste    -> verschieben (auch auf einen anderen Bildschirm)
 - Mausrad ueber dem Punkt            -> groesser / kleiner
-- Rechtsklick                        -> im Vordergrund halten, Groesse, Deckkraft, Autostart, Beenden
-- Doppelklick                        -> Formular ohne Datei
+- Rechtsklick                        -> im Vordergrund halten, Groesse, Deckkraft, Autostart,
+                                        Aktualisieren, Protokoll, Beenden
 
 Hinweise
 --------
@@ -26,5 +34,7 @@ Hinweise
   die Mail zuerst auf den Desktop ziehen und dann die Datei ablegen. Fuer Mails gibt es
   ausserdem den Planner-Knopf direkt in Outlook.
 - Ordner werden nicht uebernommen, nur Dateien.
+- Planner kennt nur Start und Faelligkeit; das Ende steht als erste Zeile in der Beschreibung.
 - Einstellungen: %APPDATA%\PlannerAblage\settings.json
 - Protokoll bei Problemen: %LOCALAPPDATA%\PlannerAblage\log.txt
+- Update: Rechtsklick auf den Punkt -> Aktualisieren (oder den Installationsbefehl erneut ausfuehren).

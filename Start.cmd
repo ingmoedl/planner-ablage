@@ -7,7 +7,7 @@ set CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe
 if not exist "%CSC%" set CSC=%WINDIR%\Microsoft.NET\Framework\v4.0.30319\csc.exe
 if not exist "%CSC%" (
   echo Der C#-Compiler wurde nicht gefunden. .NET Framework 4.8 ist Teil von Windows - bitte IT fragen.
-  pause
+  if not defined PA_STILL pause
   exit /b 1
 )
 
@@ -30,7 +30,7 @@ if "%BUILD%"=="1" (
     "%SRC%"
   if errorlevel 1 (
     echo Uebersetzen fehlgeschlagen. Bitte Samuel Moedl melden.
-    pause
+    if not defined PA_STILL pause
     exit /b 1
   )
 )
