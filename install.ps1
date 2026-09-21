@@ -43,8 +43,12 @@ Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 
 # Übersetzen, Autostart, Start
 Write-Host "  3/3  Einrichten ..."
-$proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$appDir\Installieren.cmd`" /still" -WorkingDirectory $appDir -Wait -PassThru -NoNewWindow
-if ($proc.ExitCode -ne 0) { throw "Einrichten fehlgeschlagen (Code $($proc.ExitCode)). Protokoll: $root\log.txt" }
+# Nicht mit Start-Process -Wait: das würde auch auf den gestarteten Punkt warten und nie zurückkehren.
+Push-Location $appDir
+& cmd.exe /c "`"$appDir\Installieren.cmd`" /still"
+$code = $LASTEXITCODE
+Pop-Location
+if ($code -ne 0) { throw "Einrichten fehlgeschlagen (Code $code). Protokoll: $root\log.txt" }
 
 Write-Host ""
 Write-Host "  Fertig. Der grüne Punkt ist unten rechts auf dem Hauptbildschirm." -ForegroundColor Green

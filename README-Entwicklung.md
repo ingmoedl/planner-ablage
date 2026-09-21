@@ -1,6 +1,6 @@
 # Planner-Ablage – Entwicklungsstand und Übergabe
 
-Stand 18.09.2026, v0.1. Vorgeschichte und Entscheidungen: `00-Recherche-Planner-Ablage.md`.
+Stand 21.09.2026, v0.2. Vorgeschichte und Entscheidungen: `00-Recherche-Planner-Ablage.md`.
 Schwesterprojekt: Planner-Knopf (Outlook-Add-in) in `..\PPR\planner-knopf` – **dort nichts ändern**.
 
 ## Was ist das
@@ -74,12 +74,28 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
 - Client-ID `239b6012-5d61-4e37-9041-75b0218e6a09`, Tenant `1571141a-75a9-43a3-ad47-8d613cfbb3e6`,
   Objekt-ID `dbccf354-969b-43c3-93b4-154529edd44d`, „Nur ein Mandant".
 - SPA-Redirect: `https://ingmoedl.github.io/planner-ablage/index.html`.
-- Delegierte Berechtigungen (konfiguriert, **Admin-Zustimmung steht aus**): User.Read,
-  User.ReadBasic.All, Tasks.ReadWrite, Files.ReadWrite.All. Als Nicht-Admin gibt es keinen
-  Knopf „Administratoreinwilligung erteilen"; beim ersten Login erscheint der Anfrage-Dialog.
+- Delegierte Berechtigungen: User.Read, User.ReadBasic.All, Tasks.ReadWrite, Files.ReadWrite.All.
+  **Admin-Zustimmung ist erteilt** (21.09.2026: Login im Formular lief durch, 623 Pläne geladen).
+
+## v0.2 (21.09.2026)
+- Drei Datumsfelder Start / Ende / Fällig am: Start → `startDateTime`, Fällig → `dueDateTime`,
+  Ende → erste Zeile der Beschreibung „Geplantes Ende: TT.MM.JJJJ" (Planner kennt kein drittes Datum).
+- Anlagen: `previewType: "reference"` in den Details, damit die Karte im Board die Anlage zeigt.
+- Autostart wird beim allerersten Start (keine settings.json) automatisch gesetzt.
+- Doppelklick: eigene Erkennung in `OnMouseUp` (zwei Klicks ohne Bewegung innerhalb
+  `SystemInformation.DoubleClickTime`), weil der WinForms-Doppelklick auf dem rahmenlosen Form
+  nicht zuverlässig kam. Getestet per PostMessage.
+- Ein-Befehl-Installation `install.ps1` (Repo-Wurzel, über raw.githubusercontent.com):
+  `irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex`
+  → ZIP von GitHub nach `%LOCALAPPDATA%\PlannerAblage\App`, Unblock, `Installieren.cmd /still`
+  (kompiliert, Autostart, Start). Rechtsklick-Menü „Aktualisieren" ruft denselben Befehl.
+  Falle: nicht `Start-Process -Wait` verwenden, das wartet auch auf den gestarteten Punkt.
+- Skill `skill/planner-ablage-installation` (+ .skill-Paket) für Kollegen.
+- Der Nutzer-PC läuft jetzt aus `%LOCALAPPDATA%\PlannerAblage\Appin`; der Dev-Ordner `bin\`
+  ist nur noch für Tests (`Start.cmd /build`).
 
 ## Noch zu tun
-1. Admin-Zustimmung für die App einholen (Mail an den M365-Admin; Text siehe Chat).
+1. ✅ Admin-Zustimmung erteilt.
 2. ✅ GitHub-Repo https://github.com/ingmoedl/planner-ablage (public) angelegt 18.09.2026, Pages aus
    `docs/` → https://ingmoedl.github.io/planner-ablage/index.html. Deployment wie beim Knopf:
    Cache-Buster in `docs/index.html` erhöhen, `git add -A`, commit, `git push origin main`, 30–90 s warten.
