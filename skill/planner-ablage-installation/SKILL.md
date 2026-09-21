@@ -35,7 +35,10 @@ Die meisten Kolleginnen und Kollegen sind Bauingenieure, keine IT-Leute. Deshalb
 
 Das ist das blaue Befehlsfenster von Windows. Kein Admin nötig, ganz normal öffnen:
 
-- **Windows-Taste** drücken, `PowerShell` tippen, **Enter**.
+- **Windows-Taste** drücken, `PowerShell` tippen, **Enter**. **Nicht** „Als Administrator ausführen"
+  wählen: Ein mit Adminrechten gestarteter Punkt darf aus Sicherheitsgründen von Windows keine Dateien
+  per Drag & Drop annehmen (rotes Verbotszeichen). Seit v0.4 fängt die Ablage das selbst ab, trotzdem
+  normal öffnen.
 
 Erfolgskontrolle: Ein blaues (oder schwarzes) Fenster mit einer Zeile, die auf `>` endet,
 zum Beispiel `PS C:\Users\mustermann>`.
@@ -122,6 +125,7 @@ Bedienung des Punkts (kurz mitgeben):
 | Symptom | Ursache | Lösung |
 |---|---|---|
 | PowerShell: „irm : Der Remotename konnte nicht aufgelöst werden" oder Zeitüberschreitung | Kein Internet oder github.com blockiert | Verbindung prüfen; bleibt es dabei, Samuel Mödl bitten, den Ordner „Planner-Ablage" als ZIP zu schicken – entpacken, `Installieren.cmd` doppelklicken |
+| Beim Ziehen auf den Punkt erscheint ein rotes Verbotszeichen, Drop ins Formularfenster geht | Punkt läuft mit Administratorrechten (PowerShell wurde „als Administrator" geöffnet); Windows blockiert Drag & Drop in erhöhte Programme | Rechtsklick → Beenden, dann Befehl aus Schritt 2 in einer *normalen* PowerShell erneut ausführen (oder PC neu starten). Seit v0.4 startet sich der Punkt bei Erhöhung selbst mit normalen Rechten neu |
 | PowerShell: rote Meldung „… kann nicht geladen werden, da die Ausführung von Skripts … deaktiviert ist" | Gilt nur für Skriptdateien, nicht für den Befehl oben; erscheint, wenn jemand `install.ps1` als Datei doppelgeklickt hat | Den Befehl aus Schritt 2 im PowerShell-Fenster ausführen (kein Doppelklick auf die Datei) |
 | „Der C#-Compiler (.NET Framework 4.8) fehlt" | Sehr alter oder stark reduzierter PC | Samuel Mödl informieren |
 | Punkt erscheint nicht / verschwindet nach Neustart | Autostart-Verknüpfung fehlt oder Punkt wurde mit „Beenden" geschlossen | Windows-Taste, „Planner-Ablage" tippen und starten; dann Rechtsklick → „Mit Windows starten" anhaken. Alternativ Befehl aus Schritt 2 erneut ausführen |

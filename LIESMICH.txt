@@ -8,7 +8,8 @@ Das Original bleibt, wo es war.
 
 Installieren (einmalig, kein Admin, ca. 1 Minute)
 --------------------------------------------------
-Windows-Taste druecken, "PowerShell" tippen, Enter. Dann diese Zeile einfuegen und Enter:
+Windows-Taste druecken, "PowerShell" tippen, Enter (NICHT "als Administrator" - sonst nimmt der Punkt
+keine Dateien per Drag & Drop an). Dann diese Zeile einfuegen und Enter:
 
     irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex
 
