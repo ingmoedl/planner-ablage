@@ -97,6 +97,17 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
 - Der Nutzer-PC läuft jetzt aus `%LOCALAPPDATA%\PlannerAblage\Appin`; der Dev-Ordner `bin\`
   ist nur noch für Tests (`Start.cmd /build`).
 
+## v0.4 (21.09.2026)
+- **Kollegen-PC: Drop auf den Punkt zeigte rotes Verbotszeichen**, Drop ins Formular ging. Ursache sehr
+  wahrscheinlich: `install.ps1` in einer *als Administrator* geöffneten PowerShell → Punkt lief erhöht →
+  UIPI blockiert Drag & Drop aus dem nicht erhöhten Explorer. Fix: Hülle startet sich bei Erhöhung über
+  `explorer.exe` neu (normale Rechte); `install.ps1` startet den Punkt ebenfalls über `explorer.exe`.
+  Zusätzlich akzeptiert `Dropped.HasFiles` auch `FileGroupDescriptor` (ANSI) und `Shell IDList Array`, und
+  abgelehnte Drags schreiben ihre Formate ins log.txt („Drag abgelehnt, Formate: …").
+- **Endtermin (neues Planner-UI)** ist per Graph NICHT setzbar: PATCH `endDateTime` liefert 204, wird aber
+  ignoriert (Property fehlt in v1.0 und beta, lastModified unverändert; live getestet 21.09.). Bleibt als
+  erste Zeile der Beschreibung „Geplantes Ende: …".
+
 ## Noch zu tun
 1. ✅ Admin-Zustimmung erteilt.
 2. ✅ GitHub-Repo https://github.com/ingmoedl/planner-ablage (public) angelegt 18.09.2026, Pages aus
