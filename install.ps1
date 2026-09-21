@@ -53,7 +53,13 @@ if ($code -ne 0) { throw "Einrichten fehlgeschlagen (Code $code). Protokoll: $ro
 # Punkt starten – losgelöst von diesem Fenster, damit das Skript sofort zurückkehrt
 # Über explorer.exe starten: läuft dann immer mit normalen Benutzerrechten, auch wenn diese PowerShell
 # "als Administrator" geöffnet wurde. Ein erhöhter Punkt bekäme keine Dateien per Drag & Drop (rotes Verbotszeichen).
-Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + (Join-Path $appDir "bin\PlannerAblage.exe") + '"')
+$exe = Join-Path $appDir "bin\PlannerAblage.exe"
+Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + $exe + '"')
+Start-Sleep -Seconds 3
+if (-not (Get-Process PlannerAblage -ErrorAction SilentlyContinue)) {
+  # Fallback (z. B. in Sitzungen ohne Explorer): direkt starten; die Hülle startet sich bei Erhöhung selbst neu
+  Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe)
+}
 
 Write-Host ""
 Write-Host "  Fertig. Der grüne Punkt ist unten rechts auf dem Hauptbildschirm." -ForegroundColor Green
