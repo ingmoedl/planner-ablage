@@ -63,9 +63,12 @@ bin\                       Build-Ausgabe (nicht im Git)
   Endung, Unterstriche → Leerzeichen.
 - `createTask`: erst Upload, dann `POST /planner/tasks`, dann `PATCH details` mit `description` und
   `references` (webUrl der Dateien, Typ nach Endung, `previewType: reference`).
-  Upload seit v0.5: `resolveTarget(groupId)` sucht die Bibliothek mit `webUrl` auf `/SiteAssets`
-  (erst `/groups/{id}/drives`, dann `/groups/{id}/sites/root` → `/sites/{id}/drives`; 6 h gecacht in
-  `pa_target_v1_<gid>`), Ordner `CONFIG.uploadRootFolder`/`folderName(plantitel)`;
+  Upload seit v0.5: `resolveTarget(groupId)`: `/groups/{id}/sites/root` → Team-Site; dann die versteckte
+  Bibliothek „Websiteobjekte" **per Listentitel** `/sites/{id}/lists/Websiteobjekte` (Fallback „Site Assets",
+  dann sprachunabhängig `/sites/{id}/lists?$select=…,system` und `webUrl` endet auf `/SiteAssets`), von der
+  Liste `/lists/{listId}/drive` → Drive-ID. **`/groups/{id}/drives`, `/sites/{id}/drives` und `/sites/{id}/lists`
+  ohne `system` führen Websiteobjekte NICHT auf** (geprüft 24.09.2026, Sites 2025 und 2026). 6 h gecacht in
+  `pa_target_v2_<gid>`. Ordner `CONFIG.uploadRootFolder`/`folderName(plantitel)`;
   `uploadFile(target, folder, file)` → `PUT /drives/{driveId}/root:/<Ordner>/<Datei>:/content` bis 4 MB,
   sonst `createUploadSession` in 5-MiB-Blöcken, `conflictBehavior=rename`; bei 404 legt `ensureFolder`
   die Ordnerkette an und wiederholt. Notbehelf ohne Websiteobjekte: Standardbibliothek, Ordner
