@@ -98,12 +98,19 @@ New-PaShortcut $menuLnk $exe
 if ($fresh -or $hadAutostart) { New-PaShortcut $startupLnk $exe }
 $autostart = Test-Path $startupLnk
 
-# Punkt starten - losgelöst von diesem Fenster. Über explorer.exe läuft er immer mit normalen Benutzerrechten,
-# auch wenn diese PowerShell "als Administrator" geöffnet wurde (ein erhöhter Punkt bekäme keine Dateien per Drag & Drop).
-Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + $exe + '"')
-Start-Sleep -Seconds 3
+# Punkt starten - losgelöst von diesem Fenster.
+# Normalfall (PowerShell nicht als Administrator): direkt starten.
+# Als Administrator geöffnet: über explorer.exe starten, damit der Punkt mit normalen Benutzerrechten läuft
+# (ein erhöhter Punkt bekäme keine Dateien per Drag & Drop). Klappt das nicht, direkt starten - die Hülle
+# startet sich bei Erhöhung selbst neu.
+$elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($elevated) {
+  Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + $exe + '"')
+  Start-Sleep -Seconds 3
+}
 if (-not (Get-Process PlannerAblage -ErrorAction SilentlyContinue)) {
   Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe)
+  Start-Sleep -Seconds 2
 }
 
 # Alte Versionsordner (App, App.alt, App-0.4 ...) entfernen; noch gesperrte bleiben bis zum nächsten Lauf liegen

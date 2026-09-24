@@ -140,14 +140,20 @@ Nutzerwünsche 24.09.: (1) Befehl für die aktuelle Version, (2) der Punkt soll 
   /buildonly`; scheitert das, bleibt die alte Version unangetastet), 3) Punkt beenden, Temp →
   **neuer Versionsordner `%LOCALAPPDATA%\PlannerAblage\App-<Version>`** (Prüfung: VERSION + exe vorhanden),
   4) Startmenü-Verknüpfung immer, Autostart bei Erstinstallation neu bzw. auf den neuen Ordner umgebogen, wenn
-  er an war (`$hadAutostart`), Start über explorer.exe, danach alle anderen `App*`-Ordner löschen (gesperrte
-  beim nächsten Lauf). `$env:PA_AUTO='1'` unterdrückt nur den WebView2-Hinweis; die Ausgabe landet beim
-  stillen Lauf in update.log.
+  er an war (`$hadAutostart`), Start (direkt; nur bei erhöhter PowerShell über explorer.exe), danach alle
+  anderen `App*`-Ordner löschen (gesperrte beim nächsten Lauf). `$env:PA_AUTO='1'` unterdrückt nur den
+  WebView2-Hinweis; die Ausgabe landet beim stillen Lauf in update.log.
   **Falle (24.09.):** die erste Fassung benannte `App` → `App.alt` um und verschob Temp nach `App`. Direkt nach
   `Stop-Process` blieb die Umbenennung ohne Fehlermeldung wirkungslos (exe noch gesperrt), Move-Item legte den
   neuen Stand als *Unterordner* `App\planner-ablage-main` ab und explorer.exe startete die alte exe. Deshalb:
   nie den bisherigen Programmordner umbenennen, immer in einen frischen Ordner installieren und das Ergebnis
   prüfen. `Autostart.Ensure()` in der Hülle biegt eine Verknüpfung auf den aktuellen Pfad um.
+  **Falle 2 (24.09.):** `explorer.exe "<exe>"` als Startweg zeigte beim Nutzer zweimal den Dialog „Der angegebene
+  Pfad ist nicht vorhanden" (Pfade `App.alt\bin\…` und `App-0.5\bin\…`, beide existierten); der Punkt kam nur
+  über den Fallback-Direktstart. Aufgetreten aus der Claude-Werkzeugumgebung heraus, Ursache nicht abschließend
+  geklärt (Verdacht: Punkt im Ordnernamen oder Aufrufkontext). Seitdem startet install.ps1 den Punkt **direkt**,
+  wenn PowerShell nicht erhöht ist, und nimmt explorer.exe nur noch im Administrator-Fall (Direktstart als
+  Fallback; die Hülle de-eleviert sich dann selbst).
 - **Startmenü** (`StartMenu.Ensure()` beim Start, install.ps1, Installieren.cmd):
   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Planner-Ablage.lnk` → „Windows-Taste, Planner tippen,
   Enter" findet den Punkt immer, auch ohne Autostart. Wird neu angelegt, wenn er fehlt oder auf eine andere
