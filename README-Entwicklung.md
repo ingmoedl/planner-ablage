@@ -105,7 +105,7 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
   (kompiliert, Autostart, Start). Rechtsklick-Menü „Aktualisieren" ruft denselben Befehl.
   Falle: nicht `Start-Process -Wait` verwenden, das wartet auch auf den gestarteten Punkt.
 - Skill `skill/planner-ablage-installation` (+ .skill-Paket) für Kollegen.
-- Der Nutzer-PC läuft aus `%LOCALAPPDATA%\PlannerAblage\App-<Version>in` (bis v0.4: `Appin`); der
+- Der Nutzer-PC läuft aus `%LOCALAPPDATA%\PlannerAblage\App-<Version>\bin` (bis v0.4: `App\bin`); der
   Dev-Ordner `bin\` ist nur noch für Tests (`Start.cmd /build`).
 
 ## v0.4 (21.09.2026)
