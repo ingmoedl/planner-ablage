@@ -11,6 +11,9 @@
  *
  * v0.5: hält sich selbst aktuell (Updater: VERSION-Datei im Repo prüfen, install.ps1 still ausführen),
  *       Startmenü-Eintrag „Planner-Ablage" (Windows-Taste → tippen → Enter, auch ohne Autostart).
+ * v0.6: Härtung nach Code-Review (24.09.2026): Links nur noch https zu bekannten Microsoft-/SharePoint-Adressen
+ *       (kein Process.Start mit beliebigen Pfaden), Seiten-Nachrichten nur von der eigenen Seite, das Formular darf
+ *       nur die eigene Seite und die Microsoft-Anmeldung laden, Übergabekopien werden beim Start aufgeräumt.
  */
 
 using System;
@@ -36,7 +39,7 @@ namespace PlannerAblage
 
     static class App
     {
-        public const string Version = "0.5";   // muss zur Datei VERSION im Repo passen (die Datei ist der Auslöser fürs Update)
+        public const string Version = "0.6";   // muss zur Datei VERSION im Repo passen (die Datei ist der Auslöser fürs Update)
         public const string RepoRaw = "https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/";
         public const string InstallCommand = "irm " + RepoRaw + "install.ps1 | iex";
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
@@ -69,6 +72,7 @@ namespace PlannerAblage
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 try { Directory.CreateDirectory(DataDir); Directory.CreateDirectory(LocalDir); } catch (Exception) { }
+                CleanupDrop(); // Übergabekopien eines früheren Absturzes entfernen (beim Start ist kein Formular offen)
                 bool firstRun = !File.Exists(Path.Combine(DataDir, "settings.json"));
                 Cfg = Settings.Load();
                 Log("Start v" + Updater.LocalVersion() + "  " + Application.ExecutablePath);
@@ -103,6 +107,24 @@ namespace PlannerAblage
             {
                 File.AppendAllText(Path.Combine(LocalDir, "log.txt"),
                     DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + text + Environment.NewLine);
+            }
+            catch (Exception) { }
+        }
+
+        /* %LOCALAPPDATA%\PlannerAblage\drop\<guid>\: Kopien abgelegter Dateien, die normalerweise beim Schließen des
+         * Formulars gelöscht werden. Nach einem Absturz bleiben sie liegen → beim nächsten Start weg damit. */
+        static void CleanupDrop()
+        {
+            try
+            {
+                string drop = Path.Combine(LocalDir, "drop");
+                if (!Directory.Exists(drop)) return;
+                int n = 0;
+                foreach (var d in Directory.GetDirectories(drop))
+                {
+                    try { Directory.Delete(d, true); n++; } catch (Exception) { }
+                }
+                if (n > 0) Log("Übergabeordner aufgeräumt: " + n);
             }
             catch (Exception) { }
         }
@@ -531,10 +553,17 @@ namespace PlannerAblage
                 }
 
                 core.WebMessageReceived += OnMessage;
+                // Links aus der Seite: nur https zu bekannten Microsoft-/SharePoint-Adressen im Standardbrowser öffnen
+                // (nie Process.Start mit beliebigen Pfaden – sonst könnte eine manipulierte Seite Programme starten).
                 core.NewWindowRequested += delegate(object s, CoreWebView2NewWindowRequestedEventArgs e)
                 {
                     e.Handled = true;
-                    try { Process.Start(e.Uri); } catch (Exception) { }
+                    Web.OpenExternal(e.Uri, "Link");
+                };
+                // Das Formular darf nur die eigene Seite, die Microsoft-Anmeldung und den Übergabeordner laden.
+                core.NavigationStarting += delegate(object s, CoreWebView2NavigationStartingEventArgs e)
+                {
+                    if (!Web.AllowedNavigation(e.Uri)) { e.Cancel = true; App.Log("Navigation blockiert: " + e.Uri); }
                 };
                 core.NavigationCompleted += delegate(object s, CoreWebView2NavigationCompletedEventArgs e)
                 {
@@ -556,6 +585,8 @@ namespace PlannerAblage
         {
             try
             {
+                // Nur Nachrichten der eigenen Formularseite annehmen (nicht von der Anmeldeseite oder sonst woher)
+                if (!Web.IsPageOrigin(e.Source)) { App.Log("Nachricht von fremder Herkunft verworfen: " + e.Source); return; }
                 var msg = json.Deserialize<Dictionary<string, object>>(e.WebMessageAsJson);
                 if (msg == null || !msg.ContainsKey("type")) return;
                 string type = Convert.ToString(msg["type"]);
@@ -565,7 +596,7 @@ namespace PlannerAblage
                     case "close": Close(); break;
                     case "done": Text = "Aufgabe angelegt"; break;
                     case "open":
-                        if (msg.ContainsKey("url")) { try { Process.Start(Convert.ToString(msg["url"])); } catch (Exception) { } }
+                        if (msg.ContainsKey("url")) Web.OpenExternal(Convert.ToString(msg["url"]), "open");
                         break;
                     case "log": App.Log("Seite: " + (msg.ContainsKey("text") ? Convert.ToString(msg["text"]) : "")); break;
                 }
@@ -608,6 +639,70 @@ namespace PlannerAblage
             var m = new Dictionary<string, object>();
             m["type"] = "files"; m["version"] = App.Version; m["files"] = list;
             wv.CoreWebView2.PostWebMessageAsJson(json.Serialize(m));
+        }
+    }
+
+    /* ---------- Erlaubte Adressen: was das Formular laden und was es im Browser öffnen darf ----------
+     * Die Formularseite kommt live von GitHub Pages. Würde sie manipuliert, dürfte sie trotzdem weder beliebige
+     * Seiten laden noch über die Hülle Programme oder Dateien (\\server\x.exe, file:///…) starten. */
+
+    static class Web
+    {
+        // Ziele, die aus dem Formular im Standardbrowser geöffnet werden dürfen (Planner-Aufgabe, SharePoint-Datei)
+        static readonly string[] OpenHosts = { ".sharepoint.com", ".cloud.microsoft", ".office.com", ".microsoft.com" };
+        // Innerhalb des Formulars zusätzlich erlaubt: Microsoft-Anmeldung (inkl. SSO-Zwischenschritte), Übergabeordner
+        static readonly string[] NavHosts = {
+            ".microsoftonline.com", ".microsoft.com", ".microsoftazuread-sso.com", ".msftauth.net", ".msauth.net",
+            ".live.com", ".office.com", ".office.net", ".cloud.microsoft", ".sharepoint.com", "ablage.local", "planner-ablage.local"
+        };
+
+        static bool HostMatches(string host, string[] list)
+        {
+            host = (host ?? "").ToLowerInvariant();
+            foreach (var h in list)
+            {
+                if (h.StartsWith(".")) { if (host.EndsWith(h) || host == h.Substring(1)) return true; }
+                else if (host == h) return true;
+            }
+            return false;
+        }
+
+        /* Host der konfigurierten Formularseite (Standard ingmoedl.github.io); "" bei lokaler Entwicklungsdatei. */
+        static string PageHost()
+        {
+            Uri u;
+            if (Uri.TryCreate(App.Cfg.PageUrl, UriKind.Absolute, out u) && u.Scheme == "https") return u.Host.ToLowerInvariant();
+            return "";
+        }
+
+        public static bool AllowedNavigation(string url)
+        {
+            if (string.IsNullOrEmpty(url) || url.StartsWith("about:blank")) return true;
+            Uri u;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out u) || u.Scheme != "https") return false;
+            string host = u.Host.ToLowerInvariant();
+            if (host.Length > 0 && host == PageHost()) return true;
+            return HostMatches(host, NavHosts);
+        }
+
+        public static bool IsPageOrigin(string source)
+        {
+            Uri u;
+            if (!Uri.TryCreate(source, UriKind.Absolute, out u) || u.Scheme != "https") return false;
+            string host = u.Host.ToLowerInvariant();
+            return (host.Length > 0 && host == PageHost()) || host == "planner-ablage.local";
+        }
+
+        public static void OpenExternal(string url, string what)
+        {
+            Uri u;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out u) || u.Scheme != "https" || !HostMatches(u.Host, OpenHosts))
+            {
+                App.Log(what + " nicht geöffnet (Adresse nicht erlaubt): " + url);
+                return;
+            }
+            try { Process.Start(new ProcessStartInfo(u.AbsoluteUri) { UseShellExecute = true }); }
+            catch (Exception e) { App.Log(what + " öffnen: " + e.Message); }
         }
     }
 

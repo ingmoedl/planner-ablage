@@ -15,8 +15,8 @@ if not "%~1"=="/still" (
 rem 0) Laufende Instanz beenden, sonst laesst sich die exe nicht ersetzen
 taskkill /im PlannerAblage.exe /f >nul 2>&1
 
-rem 1) Dateien aus dem Internet/ZIP freigeben (sonst blockiert Windows die DLLs)
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse -File | Unblock-File -ErrorAction SilentlyContinue"
+rem 1) Nur die WebView2-DLLs aus dem Internet/ZIP freigeben (sonst laedt .NET sie nicht); alles andere bleibt markiert
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' -Recurse -File -Filter *.dll | Unblock-File -ErrorAction SilentlyContinue"
 
 rem 2) Uebersetzen und starten
 call "%~dp0Start.cmd" /build

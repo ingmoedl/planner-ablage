@@ -5,14 +5,15 @@
  * Datei als Anlage (Referenz). Auth: MSAL.js, Redirect-Flow.
  * Abgeleitet vom Planner-Knopf v2.1 (Outlook-Add-in); Plan-, Bucket- und Personenlogik identisch.
  * v0.1: erster Stand. v0.2: drei Termine, Anlagen-Vorschau.
- * v0.5: Ablageort Websiteobjekte/Planner-Anlagen/<Plan> statt Projektordner. */
+ * v0.5: Ablageort Websiteobjekte/Planner-Anlagen/<Plan> statt Projektordner.
+ * v0.6: Härtung nach Code-Review: keine Übersteuerung der App-Registrierung per Adresse mehr, Fehlertexte escaped. */
 
 "use strict";
 
 const CONFIG = {
-  version: "0.5",
+  version: "0.6",
   // App-Registrierung "Planner-Ablage" (eigene App, NICHT der Planner-Knopf), angelegt 18.09.2026.
-  // ?client=<id>&scopes=knopf erlaubt Zwischentests mit einer anderen App.
+  // Fest verdrahtet – keine Übersteuerung per Adresse (?client=…) mehr, siehe Review 24.09.2026.
   clientId: "239b6012-5d61-4e37-9041-75b0218e6a09",
   tenantId: "1571141a-75a9-43a3-ad47-8d613cfbb3e6",
   scopes: ["User.Read", "User.ReadBasic.All", "Tasks.ReadWrite", "Files.ReadWrite.All"],
@@ -51,9 +52,8 @@ const el = (id) => document.getElementById(id);
 
 async function boot() {
   try {
-    applyQueryOverrides();
-    // Cache-Reste der alten Projektordner-Ablage (bis v0.4) entfernen
-    try { Object.keys(localStorage).filter((k) => k.startsWith("pa_folders_v1_") || k.startsWith("pa_target_v1_")).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
+    // Cache-Reste älterer Versionen entfernen (Projektordner-Ablage bis v0.4, Test-Übersteuerung bis v0.5)
+    try { Object.keys(localStorage).filter((k) => k.startsWith("pa_folders_v1_") || k.startsWith("pa_target_v1_") || k === "pa_override").forEach((k) => localStorage.removeItem(k)); } catch (_) {}
     canUpload = CONFIG.scopes.some((s) => /^(Files|Sites)\.ReadWrite/.test(s));
     wireUi();
     wireHost();
@@ -87,19 +87,8 @@ async function boot() {
       el("plan").placeholder = "Bitte zuerst anmelden (Knopf oben)";
     }
   } catch (e) {
-    showStatus("Startfehler: " + msg(e), "err");
+    showStatus("Startfehler: " + esc(msg(e)), "err");
   }
-}
-
-/* Nur für Zwischentests: ?client=<id>&scopes=knopf nutzt eine andere App (z. B. den Planner-Knopf ohne Upload). */
-function applyQueryOverrides() {
-  const q = new URLSearchParams(window.location.search);
-  if (q.get("client")) CONFIG.clientId = q.get("client");
-  if (q.get("scopes") === "knopf") CONFIG.scopes = ["User.Read", "User.ReadBasic.All", "Tasks.ReadWrite", "Mail.ReadWrite"];
-  const saved = localStorage.getItem("pa_override");
-  if (q.get("client")) localStorage.setItem("pa_override", JSON.stringify({ client: CONFIG.clientId, scopes: CONFIG.scopes }));
-  else if (saved && !CONFIG.clientId) { try { const o = JSON.parse(saved); CONFIG.clientId = o.client; CONFIG.scopes = o.scopes; } catch (_) {} }
-  if (q.get("reset") === "1") localStorage.removeItem("pa_override");
 }
 
 /* ---------- Verbindung zur Hülle ---------- */
@@ -284,7 +273,7 @@ async function loadPlans() {
     console.error("[PA] loadPlans:", e);
     if (!plans.length) {
       el("plan").placeholder = "Laden fehlgeschlagen";
-      showStatus("Pläne konnten nicht geladen werden: " + msg(e), "err");
+      showStatus("Pläne konnten nicht geladen werden: " + esc(msg(e)), "err");
     }
   }
 }

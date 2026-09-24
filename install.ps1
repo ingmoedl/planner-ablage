@@ -53,7 +53,8 @@ Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
 Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
 $src = Get-ChildItem $tmpDir -Directory | Select-Object -First 1
 if (-not $src) { throw "Das heruntergeladene Archiv war leer." }
-Get-ChildItem $src.FullName -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+# Nur die WebView2-DLLs freigeben (.NET lädt keine Bibliotheken mit Internet-Kennzeichen); alles andere behält es
+Get-ChildItem $src.FullName -Recurse -File -Filter *.dll | Unblock-File -ErrorAction SilentlyContinue
 $newVersion = (Get-Content (Join-Path $src.FullName "VERSION") -ErrorAction SilentlyContinue | Select-Object -First 1)
 if (-not $newVersion) { Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue; throw "Im Archiv fehlt die Datei VERSION." }
 $newVersion = $newVersion.Trim()

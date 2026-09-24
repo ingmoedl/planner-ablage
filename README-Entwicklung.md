@@ -51,10 +51,10 @@ bin\                       Build-Ausgabe (nicht im Git)
   Beim Schließen wird der Übergabeordner gelöscht.
 
 ### Seite (docs/app.js)
-- `CONFIG.clientId` ist **leer**, bis die App-Registrierung „Planner-Ablage" existiert.
-  Scopes: `User.Read`, `User.ReadBasic.All`, `Tasks.ReadWrite`, `Files.ReadWrite.All`.
-  Zwischentest mit anderer App: `?client=<id>&scopes=knopf` (wird in localStorage `pa_override`
-  gemerkt, `?reset=1` löscht das). Ohne `Files.*`-Scope läuft der Testmodus ohne Upload.
+- `CONFIG.clientId` = App-Registrierung „Planner-Ablage", fest verdrahtet. Scopes: `User.Read`,
+  `User.ReadBasic.All`, `Tasks.ReadWrite`, `Files.ReadWrite.All`. Die frühere Test-Übersteuerung per
+  `?client=<id>&scopes=knopf` (localStorage `pa_override`) wurde in v0.6 entfernt (Review: fremde App-Registrierung
+  einschleusbar). Für Tests mit anderer App: Konstante lokal ändern, `PageUrl` auf die lokale index.html setzen.
 - MSAL: `PublicClientApplication`, **cacheLocation localStorage** (jedes Formularfenster ist ein
   neuer Tab), Redirect-Flow (`acquireTokenRedirect`), `handleRedirectPromise` beim Start.
 - Pläne/Buckets/Personen: identisch zum Knopf v2.1 (memberOf → `$batch` je Gruppe), zusätzlich
@@ -171,6 +171,40 @@ Nutzerwünsche 24.09.: (1) Befehl für die aktuelle Version, (2) der Punkt soll 
    install.ps1) bis 5 min Cache.
 4. Punkte ab v0.5 holen das Update von selbst (spätestens nach 6 h bzw. 45 s nach dem nächsten Start).
    Punkte ≤ v0.4 einmal per Rechtsklick → „Aktualisieren" oder mit dem irm-Befehl nachziehen.
+
+## v0.6 (24.09.2026) – Härtung nach Code-Review
+
+Ein Kollege (Mathias) hat den Code mit Claude durchgesehen; die Punkte und ihr Stand:
+
+1. ✅ **Beliebige Programme startbar** (`Process.Start(url)` in `NewWindowRequested` und `open`-Nachricht): jetzt
+   `Web.OpenExternal` – nur `https` und nur Hosts `*.sharepoint.com`, `*.cloud.microsoft`, `*.office.com`,
+   `*.microsoft.com`; alles andere wird verworfen und protokolliert.
+2. ✅ **Keine Herkunftsprüfung**: `OnMessage` nimmt nur Nachrichten an, deren `e.Source` vom Host der
+   konfigurierten `PageUrl` (bzw. `planner-ablage.local` in der Entwicklung) stammt. `NavigationStarting` lässt
+   nur die eigene Seite, Microsoft-Anmeldung (`*.microsoftonline.com`, `*.microsoft.com`, `*.msftauth.net`,
+   `*.msauth.net`, `*.live.com`, `*.microsoftazuread-sso.com`, `*.office.com/.net`, `*.cloud.microsoft`,
+   `*.sharepoint.com`) und `ablage.local` zu; Blockierungen stehen im log.txt („Navigation blockiert: …").
+   **Achtung:** ein föderierter Anmeldedienst (ADFS o. ä. auf eigener Domain) würde blockiert – dann Host in
+   `Web.NavHosts` ergänzen.
+3. ⏳ **Organisatorisch** (Entscheidung Geschäftsführung, siehe Abschlussbericht 24.09.): Trust-Anker ist das
+   GitHub-Konto `ingmoedl`. Umgesetzt: Branch `main` gegen Force-Push und Löschen geschützt (auch für den Besitzer).
+   Offen: 2FA am Konto prüfen/erzwingen, Repo in eine Firmen-Organisation, Entra-App auf eine Nutzergruppe
+   beschränken, Berechtigung `Files.ReadWrite.All` durch `Sites.Selected` (nur Sites 2020–2026) ersetzen –
+   Letzteres ändert das Scope-Set und braucht eine neue Admin-Zustimmung.
+4. ✅ **Test-Hintertür** `?client=<id>` in app.js entfernt (Funktion `applyQueryOverrides`, localStorage `pa_override`
+   wird beim Start gelöscht).
+5. ✅ **Fremde DLLs**: SHA-256 der drei WebView2-DLLs am 24.09.2026 gegen das offizielle NuGet-Paket
+   `Microsoft.Web.WebView2` 1.0.4191.47 (nuget.org) verglichen – **alle identisch**:
+   `Microsoft.Web.WebView2.Core.dll` (lib/net462) `e6f54c8c…f550`, `Microsoft.Web.WebView2.WinForms.dll`
+   (lib/net462) `cc3d2937…e849`, `WebView2Loader.dll` (runtimes/win-x64/native) `c66e4a92…c5bc`.
+   Prüfbefehl: `curl -L -o wv2.nupkg https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/1.0.4191.47`,
+   entpacken, `sha256sum` vergleichen.
+6. ✅ **Fehlertexte**: `esc()` um `msg(e)` in „Startfehler" und „Pläne konnten nicht geladen werden".
+7. ✅ **Temporäre Kopien**: `App.CleanupDrop()` löscht beim Start alle `drop\<guid>`-Ordner (beim Start ist kein
+   Formular offen).
+- Installer: `Unblock-File` nur noch für `*.dll` (install.ps1, Installieren.cmd).
+- Auto-Update ohne Signatur: bewusst so belassen – eine Signaturprüfung mit Schlüssel im selben Repo brächte nichts;
+  ein getrennter Signierschlüssel wäre der nächste Schritt, falls die Geschäftsführung das verlangt.
 
 ## Noch zu tun
 1. ✅ Admin-Zustimmung erteilt.
