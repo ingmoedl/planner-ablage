@@ -1,6 +1,10 @@
 @echo off
-rem Planner-Ablage starten. Kompiliert die Hülle beim ersten Mal (oder nach Änderungen) mit dem
+rem Planner-Ablage starten. Kompiliert die Huelle beim ersten Mal (oder nach Aenderungen) mit dem
 rem C#-Compiler, der in jedem Windows enthalten ist. Kein Admin, keine Installation.
+rem   Start.cmd            bei Bedarf uebersetzen, dann starten
+rem   Start.cmd /build     immer uebersetzen, dann starten
+rem   Start.cmd /buildonly immer uebersetzen, nicht starten (install.ps1)
+rem Nur ASCII in dieser Datei: Umlaute bringen cmd.exe unter Codepage 65001 dazu, Zeilenanfaenge zu verschlucken.
 setlocal
 cd /d "%~dp0"
 set CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe
@@ -16,7 +20,8 @@ set SRC=Huelle\PlannerAblage.cs
 set BUILD=0
 if not exist "%EXE%" set BUILD=1
 if "%~1"=="/build" set BUILD=1
-if exist "%EXE%" (
+if "%~1"=="/buildonly" set BUILD=1
+if "%BUILD%"=="0" (
   for /f %%A in ('powershell -NoProfile -Command "if ((Get-Item '%SRC%').LastWriteTime -gt (Get-Item '%EXE%').LastWriteTime) { 1 } else { 0 }"') do set BUILD=%%A
 )
 
@@ -35,7 +40,8 @@ if "%BUILD%"=="1" (
   )
 )
 
+if "%~1"=="/buildonly" exit /b 0
 rem Falls schon ein Punkt laeuft, beendet sich der zweite Start von selbst.
-rem Bei stiller Installation (install.ps1) startet das Skript den Punkt selbst.
+rem Bei stiller Installation (PA_STILL) startet das aufrufende Skript den Punkt selbst.
 if not defined PA_STILL start "" "%EXE%"
 exit /b 0

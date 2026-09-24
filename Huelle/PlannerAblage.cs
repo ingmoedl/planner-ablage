@@ -8,6 +8,9 @@
  *
  * Wird beim ersten Start lokal mit dem in Windows enthaltenen C#-Compiler übersetzt (Start.cmd).
  * Sprachstand C# 5 (csc 4.8 aus .NET Framework) – keine neueren Sprachfeatures verwenden.
+ *
+ * v0.5: hält sich selbst aktuell (Updater: VERSION-Datei im Repo prüfen, install.ps1 still ausführen),
+ *       Startmenü-Eintrag „Planner-Ablage" (Windows-Taste → tippen → Enter, auch ohne Autostart).
  */
 
 using System;
@@ -16,6 +19,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
@@ -32,11 +36,14 @@ namespace PlannerAblage
 
     static class App
     {
-        public const string Version = "0.4";
-        public const string InstallCommand = "irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex";
+        public const string Version = "0.5";   // muss zur Datei VERSION im Repo passen (die Datei ist der Auslöser fürs Update)
+        public const string RepoRaw = "https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/";
+        public const string InstallCommand = "irm " + RepoRaw + "install.ps1 | iex";
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
         public static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PlannerAblage");
         public static readonly string LocalDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PlannerAblage");
+        /* Programmordner (…\App): eine Ebene über bin\, dort liegen VERSION, install.ps1, Huelle\ … */
+        public static readonly string AppDir = Path.GetDirectoryName(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
         public static Settings Cfg;
 
         [STAThread]
@@ -64,7 +71,9 @@ namespace PlannerAblage
                 try { Directory.CreateDirectory(DataDir); Directory.CreateDirectory(LocalDir); } catch (Exception) { }
                 bool firstRun = !File.Exists(Path.Combine(DataDir, "settings.json"));
                 Cfg = Settings.Load();
+                Log("Start v" + Updater.LocalVersion() + "  " + Application.ExecutablePath);
                 if (firstRun && !Autostart.IsEnabled()) Autostart.Set(true); // ab dem ersten Start mit Windows starten
+                StartMenu.Ensure(); // „Windows-Taste → Planner" findet den Punkt immer, auch wenn der Autostart aus ist
                 Application.ThreadException += delegate(object s, ThreadExceptionEventArgs e)
                 {
                     MessageBox.Show("Unerwarteter Fehler:\n\n" + e.Exception.Message, "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -110,6 +119,7 @@ namespace PlannerAblage
         public string PageUrl = App.DefaultPageUrl;   // https-Adresse oder lokaler Pfad zu index.html (Entwicklung)
         public int FormWidth = 440;
         public int FormHeight = 780;
+        public bool AutoUpdate = true;                // neue Version selbst holen (Rechtsklick → „Automatisch aktualisieren")
 
         static string PathFile { get { return Path.Combine(App.DataDir, "settings.json"); } }
 
@@ -150,7 +160,7 @@ namespace PlannerAblage
         bool hover, dragOver, moving, moved;
         Point moveStart, moveOrigin;
         ContextMenuStrip menu;
-        ToolStripMenuItem miTop, miAutostart;
+        ToolStripMenuItem miTop, miAutostart, miAbout;
         ToolTip tip;
         readonly List<string> initialFiles;
 
@@ -173,6 +183,19 @@ namespace PlannerAblage
             BuildMenu();
             tip = new ToolTip();
             tip.SetToolTip(this, "Datei hierher ziehen → Aufgabe in Planner\nDoppelklick: Formular ohne Datei\nMausrad: Größe · Rechtsklick: Optionen");
+            Updater.Attach(this);
+        }
+
+        /* Kurzer Hinweis über dem Punkt (z. B. „wird aktualisiert …"). */
+        public void ShowHint(string text)
+        {
+            try { tip.Show(text, this, Width / 2, -30, 6000); } catch (Exception) { }
+        }
+
+        public void RefreshVersionItem()
+        {
+            if (miAbout == null) return;
+            miAbout.Text = "Planner-Ablage v" + Updater.LocalVersion() + (Updater.Available != null ? "  –  v" + Updater.Available + " verfügbar" : "");
         }
 
         protected override void OnShown(EventArgs e)
@@ -248,23 +271,26 @@ namespace PlannerAblage
             miAutostart.CheckedChanged += delegate { Autostart.Set(miAutostart.Checked); miAutostart.Checked = Autostart.IsEnabled(); };
             menu.Items.Add(miAutostart);
 
-            var miUpdate = new ToolStripMenuItem("Aktualisieren (neueste Version holen)");
-            miUpdate.Click += delegate
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"" + App.InstallCommand + "\"") { UseShellExecute = true });
-                }
-                catch (Exception ex) { MessageBox.Show("Aktualisierung konnte nicht gestartet werden:\n" + ex.Message, "Planner-Ablage"); }
-            };
-            menu.Items.Add(miUpdate);
+            var miAuto = new ToolStripMenuItem("Automatisch aktualisieren");
+            miAuto.CheckOnClick = true; miAuto.Checked = App.Cfg.AutoUpdate;
+            miAuto.CheckedChanged += delegate { App.Cfg.AutoUpdate = miAuto.Checked; App.Cfg.Save(); };
+            menu.Items.Add(miAuto);
+
+            var miCheck = new ToolStripMenuItem("Jetzt auf neue Version prüfen");
+            miCheck.Click += delegate { Updater.Check(true); };
+            menu.Items.Add(miCheck);
+
+            var miReinstall = new ToolStripMenuItem("Neu installieren / reparieren");
+            miReinstall.Click += delegate { Updater.Run(false); };
+            menu.Items.Add(miReinstall);
 
             var miLog = new ToolStripMenuItem("Protokoll-Ordner öffnen");
             miLog.Click += delegate { try { Process.Start("explorer.exe", App.LocalDir); } catch (Exception) { } };
             menu.Items.Add(miLog);
 
-            var miAbout = new ToolStripMenuItem("Planner-Ablage v" + App.Version);
+            miAbout = new ToolStripMenuItem();
             miAbout.Enabled = false;
+            RefreshVersionItem();
             menu.Items.Add(miAbout);
 
             menu.Items.Add(new ToolStripSeparator());
@@ -793,6 +819,39 @@ namespace PlannerAblage
         }
     }
 
+    /* ---------- Verknüpfungen (.lnk) über WScript.Shell ---------- */
+
+    static class Shortcuts
+    {
+        const string Description = "Planner-Ablage: Datei ablegen, Aufgabe in Planner anlegen";
+
+        public static void Create(string linkPath)
+        {
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            object shell = Activator.CreateInstance(shellType);
+            object link = shellType.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { linkPath });
+            var lt = link.GetType();
+            lt.InvokeMember("TargetPath", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Application.ExecutablePath });
+            lt.InvokeMember("WorkingDirectory", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Path.GetDirectoryName(Application.ExecutablePath) });
+            lt.InvokeMember("Description", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Description });
+            lt.InvokeMember("IconLocation", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Application.ExecutablePath + ",0" });
+            lt.InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, link, null);
+        }
+
+        /* Zielpfad einer bestehenden Verknüpfung ("" wenn nicht lesbar). */
+        public static string Target(string linkPath)
+        {
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("WScript.Shell");
+                object shell = Activator.CreateInstance(shellType);
+                object link = shellType.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { linkPath });
+                return Convert.ToString(link.GetType().InvokeMember("TargetPath", System.Reflection.BindingFlags.GetProperty, null, link, null));
+            }
+            catch (Exception) { return ""; }
+        }
+    }
+
     /* ---------- Autostart über den Benutzer-Startordner (kein Admin nötig) ---------- */
 
     static class Autostart
@@ -809,20 +868,174 @@ namespace PlannerAblage
             try
             {
                 if (!on) { if (File.Exists(LinkPath)) File.Delete(LinkPath); return; }
-                var shellType = Type.GetTypeFromProgID("WScript.Shell");
-                object shell = Activator.CreateInstance(shellType);
-                object link = shellType.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { LinkPath });
-                var lt = link.GetType();
-                lt.InvokeMember("TargetPath", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Application.ExecutablePath });
-                lt.InvokeMember("WorkingDirectory", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Path.GetDirectoryName(Application.ExecutablePath) });
-                lt.InvokeMember("Description", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { "Planner-Ablage: Datei ablegen, Aufgabe in Planner anlegen" });
-                lt.InvokeMember("IconLocation", System.Reflection.BindingFlags.SetProperty, null, link, new object[] { Application.ExecutablePath + ",0" });
-                lt.InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, link, null);
+                Shortcuts.Create(LinkPath);
             }
             catch (Exception e)
             {
                 App.Log("Autostart: " + e.Message);
                 MessageBox.Show("Autostart konnte nicht gesetzt werden:\n" + e.Message, "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+    }
+
+    /* ---------- Startmenü-Eintrag: Windows-Taste → „Planner" tippen → Enter ---------- */
+
+    static class StartMenu
+    {
+        static string LinkPath
+        {
+            get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Planner-Ablage.lnk"); }
+        }
+
+        /* Anlegen, falls er fehlt oder auf eine andere exe zeigt (z. B. nach einem Update aus einem anderen Ordner). */
+        public static void Ensure()
+        {
+            try
+            {
+                if (File.Exists(LinkPath) && string.Equals(Shortcuts.Target(LinkPath), Application.ExecutablePath, StringComparison.OrdinalIgnoreCase)) return;
+                Shortcuts.Create(LinkPath);
+                App.Log("Startmenü-Eintrag angelegt: " + LinkPath);
+            }
+            catch (Exception e) { App.Log("Startmenü: " + e.Message); }
+        }
+    }
+
+    /* ---------- Automatische Aktualisierung ----------
+     * Auslöser ist die Datei VERSION im Repo (raw.githubusercontent.com). Ist sie neuer als die lokale
+     * VERSION im Programmordner, läuft install.ps1 still im Hintergrund: lädt den Stand, übersetzt ihn
+     * im Temp-Ordner, beendet den Punkt, tauscht den Programmordner und startet den Punkt neu.
+     * Einstellungen (%APPDATA%) und Anmeldung (WebView2-Profil) bleiben dabei erhalten. */
+
+    static class Updater
+    {
+        const int FirstCheckMs = 45 * 1000;          // nach dem Start kurz warten – die Anmeldung am PC nicht bremsen
+        const int IntervalMs = 6 * 60 * 60 * 1000;   // danach alle 6 Stunden
+        const int RetryMs = 10 * 60 * 1000;          // Formular offen → in 10 Minuten erneut
+        static System.Windows.Forms.Timer timer;
+        static DropForm owner;
+        static bool busy;
+        public static string Available;              // neuere Version im Repo, falls bekannt
+
+        public static void Attach(DropForm form)
+        {
+            owner = form;
+            timer = new System.Windows.Forms.Timer();
+            timer.Interval = FirstCheckMs;
+            timer.Tick += delegate
+            {
+                timer.Interval = IntervalMs;
+                if (App.Cfg.AutoUpdate) Check(false);
+            };
+            timer.Start();
+        }
+
+        /* Installierte Version: Datei VERSION im Programmordner, sonst die einkompilierte. */
+        public static string LocalVersion()
+        {
+            try
+            {
+                string p = Path.Combine(App.AppDir, "VERSION");
+                if (File.Exists(p)) { string v = File.ReadAllText(p, Encoding.UTF8).Trim(); if (v.Length > 0) return v; }
+            }
+            catch (Exception) { }
+            return App.Version;
+        }
+
+        /* Prüft im Hintergrund. manual = aus dem Menü: Ergebnis als Meldung, Update nur nach Rückfrage. */
+        public static void Check(bool manual)
+        {
+            if (busy) return;
+            busy = true;
+            string local = LocalVersion();
+            Task.Run(new Action(delegate
+            {
+                string remote = null, error = null;
+                try { remote = FetchRemoteVersion(); }
+                catch (Exception e) { error = e.Message; }
+                try { owner.BeginInvoke(new Action(delegate { OnChecked(manual, local, remote, error); })); }
+                catch (Exception) { busy = false; }
+            }));
+        }
+
+        static string FetchRemoteVersion()
+        {
+            ServicePointManager.SecurityProtocol = ServicePointManager.SecurityProtocol | SecurityProtocolType.Tls12;
+            var req = (HttpWebRequest)WebRequest.Create(App.RepoRaw + "VERSION?t=" + DateTime.UtcNow.Ticks);
+            req.Timeout = 10000;
+            req.UserAgent = "PlannerAblage/" + App.Version;
+            req.CachePolicy = new System.Net.Cache.HttpRequestCachePolicy(System.Net.Cache.HttpRequestCacheLevel.NoCacheNoStore);
+            using (var res = (HttpWebResponse)req.GetResponse())
+            using (var sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8))
+            {
+                string s = sr.ReadToEnd().Trim();
+                if (s.Length == 0 || s.Length > 20) throw new Exception("Unerwartete Antwort vom Server");
+                return s;
+            }
+        }
+
+        static void OnChecked(bool manual, string local, string remote, string error)
+        {
+            busy = false;
+            if (remote == null)
+            {
+                App.Log("Versionsprüfung fehlgeschlagen: " + error);
+                if (manual) MessageBox.Show("Die Versionsprüfung ist fehlgeschlagen:\n" + error, "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (!IsNewer(remote, local))
+            {
+                Available = null;
+                owner.RefreshVersionItem();
+                App.Log("Versionsprüfung: v" + local + " ist aktuell");
+                if (manual) MessageBox.Show("Planner-Ablage v" + local + " ist aktuell.", "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            Available = remote;
+            owner.RefreshVersionItem();
+            if (manual)
+            {
+                var r = MessageBox.Show("Version " + remote + " ist verfügbar (installiert: " + local + ").\n\nJetzt aktualisieren? Der Punkt startet danach neu; Einstellungen und Anmeldung bleiben erhalten.",
+                    "Planner-Ablage", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (r == DialogResult.Yes) Run(false);
+                return;
+            }
+            if (Application.OpenForms.Count > 1)
+            {
+                // Ein Formular ist offen → nicht mitten in der Arbeit neu starten
+                App.Log("Update auf v" + remote + " verschoben (Formular offen)");
+                timer.Interval = RetryMs;
+                return;
+            }
+            App.Log("Automatische Aktualisierung v" + local + " → v" + remote);
+            owner.ShowHint("Planner-Ablage wird auf Version " + remote + " aktualisiert …");
+            Run(true);
+        }
+
+        public static bool IsNewer(string remote, string local)
+        {
+            Version a, b;
+            if (Version.TryParse(remote, out a) && Version.TryParse(local, out b)) return a > b;
+            return remote != local;
+        }
+
+        /* install.ps1 frisch aus dem Repo ausführen. silent: verstecktes Fenster, Ausgabe nach update.log,
+         * Autostart bleibt wie er ist ($env:PA_AUTO=1). Das Skript beendet diesen Prozess und startet ihn neu. */
+        public static void Run(bool silent)
+        {
+            try
+            {
+                string log = Path.Combine(App.LocalDir, "update.log");
+                string cmd = "$env:PA_AUTO='" + (silent ? "1" : "0") + "'; irm '" + App.RepoRaw + "install.ps1?t=" + DateTime.UtcNow.Ticks + "' | iex";
+                if (silent) cmd = "& { " + cmd + " } *> '" + log + "'";
+                var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass " + (silent ? "-WindowStyle Hidden " : "") + "-Command \"" + cmd + "\"");
+                psi.UseShellExecute = true;
+                if (silent) psi.WindowStyle = ProcessWindowStyle.Hidden;
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                App.Log("Update starten: " + ex.Message);
+                if (!silent) MessageBox.Show("Aktualisierung konnte nicht gestartet werden:\n" + ex.Message, "Planner-Ablage");
             }
         }
     }

@@ -3,22 +3,33 @@ Planner-Ablage  (ing Burghausen GmbH, Samuel Moedl)
 
 Ein kleiner gruener Punkt auf dem Bildschirm. Datei darauf ziehen, daneben oeffnet sich
 "Aufgabe in Planner": Projekt, Bucket, Titel, Zuweisen, Start, Ende, Faellig am, Notizen.
-Die Datei wird im richtigen Jahres-Team abgelegt und haengt als Anlage an der Aufgabe.
+Die Datei haengt danach als Anlage an der Aufgabe. Gespeichert wird sie in der Anlagen-
+Bibliothek des Jahres-Teams - NICHT im Projektordner, also auch nicht im Explorer.
 Das Original bleibt, wo es war.
 
-Installieren (einmalig, kein Admin, ca. 1 Minute)
---------------------------------------------------
+Installieren oder auf die neueste Version bringen (kein Admin, ca. 1 Minute)
+----------------------------------------------------------------------------
 Windows-Taste druecken, "PowerShell" tippen, Enter (NICHT "als Administrator" - sonst nimmt der Punkt
 keine Dateien per Drag & Drop an). Dann diese Zeile einfuegen und Enter:
 
     irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex
 
 Das laedt den aktuellen Stand, richtet alles unter %LOCALAPPDATA%\PlannerAblage ein und
-startet den Punkt. Er startet ab dann automatisch mit Windows.
+startet den Punkt. Beim ersten Mal wird der Autostart mit Windows eingeschaltet.
 Beim ersten Ablegen einer Datei einmal mit dem Firmenkonto bei Microsoft anmelden.
 
 Alternativ ohne Internet-Befehl: diesen Ordner irgendwohin kopieren und Installieren.cmd
 doppelklicken.
+
+Aktualisierung: ab Version 0.5 holt sich der Punkt neue Versionen selbst (Pruefung kurz nach
+dem Start und alle 6 Stunden, laeuft im Hintergrund, Einstellungen und Anmeldung bleiben).
+Abschaltbar per Rechtsklick -> "Automatisch aktualisieren".
+
+Punkt starten, wenn er nicht da ist
+-----------------------------------
+Windows-Taste druecken, "Planner-Ablage" tippen, Enter. (Der Punkt steht im Startmenue.)
+Soll er wieder automatisch mit Windows starten: Rechtsklick auf den Punkt -> "Mit Windows starten".
+Programmdatei: %LOCALAPPDATA%\PlannerAblage\App\bin\PlannerAblage.exe
 
 Bedienung
 ---------
@@ -27,7 +38,8 @@ Bedienung
 - Punkt mit gedrueckter Maustaste    -> verschieben (auch auf einen anderen Bildschirm)
 - Mausrad ueber dem Punkt            -> groesser / kleiner
 - Rechtsklick                        -> im Vordergrund halten, Groesse, Deckkraft, Autostart,
-                                        Aktualisieren, Protokoll, Beenden
+                                        automatisch aktualisieren, auf neue Version pruefen,
+                                        neu installieren, Protokoll, Beenden
 
 Hinweise
 --------
@@ -36,6 +48,7 @@ Hinweise
   ausserdem den Planner-Knopf direkt in Outlook.
 - Ordner werden nicht uebernommen, nur Dateien.
 - Planner kennt nur Start und Faelligkeit; das Ende steht als erste Zeile in der Beschreibung.
+- Die Anlage liegt im Jahres-Team unter Websiteobjekte\Planner-Anlagen\<Projekt>. Sie ist ueber
+  die Aufgabe erreichbar und wird nicht mit dem Explorer synchronisiert.
 - Einstellungen: %APPDATA%\PlannerAblage\settings.json
-- Protokoll bei Problemen: %LOCALAPPDATA%\PlannerAblage\log.txt
-- Update: Rechtsklick auf den Punkt -> Aktualisieren (oder den Installationsbefehl erneut ausfuehren).
+- Protokoll bei Problemen: %LOCALAPPDATA%\PlannerAblage\log.txt (Updates: update.log)

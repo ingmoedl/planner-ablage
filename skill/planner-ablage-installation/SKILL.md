@@ -9,12 +9,14 @@ Du begleitest eine Kollegin oder einen Kollegen der ing Burghausen GmbH dabei, d
 **Planner-Ablage** einzurichten und das erste Mal zu benutzen. Das ist ein kleiner grüner
 Punkt auf dem Bildschirm: Datei darauf ziehen, daneben öffnet sich sofort das Formular
 „Aufgabe in Planner" (Projekt, Bucket, Titel, Zuweisen an, Start, Ende, Fällig am, Notizen).
-Die Datei wird im Jahres-Team des Projekts abgelegt und hängt als Anlage an der Aufgabe.
-Das Original bleibt, wo es war. Doppelklick auf den Punkt öffnet das Formular ohne Datei.
+Die Datei hängt danach als Anlage an der Aufgabe; gespeichert wird sie in der Anlagen-Bibliothek
+des Jahres-Teams, **nicht** im Projektordner (taucht also nicht im Explorer auf). Das Original
+bleibt, wo es war. Doppelklick auf den Punkt öffnet das Formular ohne Datei.
 
 Die Installation dauert etwa eine Minute, braucht **keine Admin-Rechte** und besteht aus
-einem einzigen Befehl. Sie geht nur über den Bildschirm der Person selbst: Du bereitest vor,
-erklärst und prüfst – die Klicks macht sie.
+einem einzigen Befehl. Derselbe Befehl bringt eine ältere Installation auf den neuesten Stand.
+Ab Version 0.5 hält sich der Punkt danach selbst aktuell. Die Installation geht nur über den
+Bildschirm der Person selbst: Du bereitest vor, erklärst und prüfst – die Klicks macht sie.
 
 ## So begleitest du
 
@@ -53,16 +55,18 @@ irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 |
 ```
 
 Was passiert: Der Befehl lädt den aktuellen Stand der Planner-Ablage von GitHub (dort
-liegt nur Programmcode, keine Firmendaten), legt ihn im eigenen Benutzerprofil unter
-`%LOCALAPPDATA%\PlannerAblage` ab, übersetzt das kleine Programm direkt auf dem PC (deshalb
-gibt es keine Warnung wegen fremder Programme), richtet den Autostart ein und startet den
-Punkt. Es wird nichts systemweit installiert.
+liegt nur Programmcode, keine Firmendaten), übersetzt das kleine Programm direkt auf dem PC
+(deshalb gibt es keine Warnung wegen fremder Programme), legt es im eigenen Benutzerprofil
+unter `%LOCALAPPDATA%\PlannerAblage` ab, trägt es ins Startmenü ein, schaltet bei der
+Erstinstallation den Autostart ein und startet den Punkt. Es wird nichts systemweit
+installiert. Bei einer bestehenden Installation bleiben Einstellungen, Anmeldung und die
+Autostart-Wahl erhalten.
 
-Erfolgskontrolle: Im Fenster erscheinen die Zeilen „1/3 Herunterladen", „2/3 Dateien
-ablegen", „3/3 Einrichten" und am Ende grün **„Fertig. Der grüne Punkt ist unten rechts
-auf dem Hauptbildschirm."** Unten rechts auf dem Hauptbildschirm (über der Uhr) sitzt ein
-runder grüner Punkt mit Pfeil und dem Wort „Planner". Das PowerShell-Fenster kann jetzt
-geschlossen werden.
+Erfolgskontrolle: Im Fenster erscheinen die Zeilen „1/4 Herunterladen", „2/4 Übersetzen",
+„3/4 Dateien ablegen", „4/4 Einrichten" und am Ende grün **„Fertig. Planner-Ablage v0.5
+läuft - der grüne Punkt ist unten rechts auf dem Hauptbildschirm."** (Versionsnummer kann
+höher sein.) Unten rechts auf dem Hauptbildschirm (über der Uhr) sitzt ein runder grüner
+Punkt mit Pfeil und dem Wort „Planner". Das PowerShell-Fenster kann jetzt geschlossen werden.
 
 Häufige Falle: Wenn stattdessen „irm : Der Remotename konnte nicht aufgelöst werden"
 erscheint, fehlt gerade die Internetverbindung oder github.com ist blockiert – siehe
@@ -107,9 +111,12 @@ Am besten mit einer Datei, in deren Namen eine Projektnummer steht (z. B.
    Beschreibung, weil Planner kein drittes Datum kennt.
 7. **Notizen** – optional, wird zur Beschreibung der Aufgabe.
 8. **„Aufgabe erstellen"** → Fortschrittsbalken beim Ablegen der Datei, dann
-   „✓ Aufgabe angelegt in … → Bucket …", „1 Datei im Team abgelegt und angehängt" und der
-   Link **„In Planner öffnen"**. Im Planner steht die Datei unter „Anlagen" der Aufgabe und
-   liegt in den Dateien des Jahres-Teams im Ordner des Projekts.
+   „✓ Aufgabe angelegt in … → Bucket …", „1 Datei als Anlage angehängt – gespeichert in der
+   Anlagen-Bibliothek des Teams, nicht im Projektordner" und der Link **„In Planner öffnen"**.
+   Im Planner steht die Datei unter „Anlagen" der Aufgabe (mit Vorschau auf der Karte). Sie
+   liegt in der Bibliothek „Websiteobjekte" des Jahres-Teams im Ordner
+   `Planner-Anlagen\<Projekt>` – die wird nicht mit dem Explorer synchronisiert, deshalb
+   taucht die Datei dort nicht auf. Erreichbar ist sie über die Aufgabe.
 
 Danach das Formular mit „Schließen" zumachen. Der Punkt bleibt.
 
@@ -117,8 +124,10 @@ Bedienung des Punkts (kurz mitgeben):
 - **Ziehen** mit gedrückter Maustaste → verschieben, auch auf einen anderen Bildschirm.
 - **Mausrad** über dem Punkt → größer/kleiner.
 - **Rechtsklick** → „Im Vordergrund halten" an/aus, Größe, Deckkraft, „Mit Windows
-  starten", „Aktualisieren", „Protokoll-Ordner öffnen", „Beenden".
+  starten", „Automatisch aktualisieren", „Jetzt auf neue Version prüfen",
+  „Neu installieren / reparieren", „Protokoll-Ordner öffnen", Versionsnummer, „Beenden".
 - **Doppelklick** → Formular ohne Datei (Aufgabe ohne Anlage).
+- **Punkt weg?** Windows-Taste, „Planner-Ablage" tippen, Enter – er steht im Startmenü.
 
 ## Fehlerbehebung
 
@@ -128,7 +137,9 @@ Bedienung des Punkts (kurz mitgeben):
 | Beim Ziehen auf den Punkt erscheint ein rotes Verbotszeichen, Drop ins Formularfenster geht | Punkt läuft mit Administratorrechten (PowerShell wurde „als Administrator" geöffnet); Windows blockiert Drag & Drop in erhöhte Programme | Rechtsklick → Beenden, dann Befehl aus Schritt 2 in einer *normalen* PowerShell erneut ausführen (oder PC neu starten). Seit v0.4 startet sich der Punkt bei Erhöhung selbst mit normalen Rechten neu |
 | PowerShell: rote Meldung „… kann nicht geladen werden, da die Ausführung von Skripts … deaktiviert ist" | Gilt nur für Skriptdateien, nicht für den Befehl oben; erscheint, wenn jemand `install.ps1` als Datei doppelgeklickt hat | Den Befehl aus Schritt 2 im PowerShell-Fenster ausführen (kein Doppelklick auf die Datei) |
 | „Der C#-Compiler (.NET Framework 4.8) fehlt" | Sehr alter oder stark reduzierter PC | Samuel Mödl informieren |
-| Punkt erscheint nicht / verschwindet nach Neustart | Autostart-Verknüpfung fehlt oder Punkt wurde mit „Beenden" geschlossen | Windows-Taste, „Planner-Ablage" tippen und starten; dann Rechtsklick → „Mit Windows starten" anhaken. Alternativ Befehl aus Schritt 2 erneut ausführen |
+| Punkt erscheint nicht / verschwindet nach Neustart | Autostart ist aus (Rechtsklick-Menü oder Task-Manager „Autostart") oder der Punkt wurde mit „Beenden" geschlossen | Windows-Taste, „Planner-Ablage" tippen, Enter (Startmenü-Eintrag, ab v0.5 immer vorhanden); soll er wieder mit Windows starten: Rechtsklick → „Mit Windows starten" anhaken. Fehlt der Startmenü-Eintrag: Befehl aus Schritt 2 erneut ausführen |
+| Punkt zeigt kurz „wird auf Version … aktualisiert", verschwindet und kommt nach etwa einer Minute wieder | Normal: automatische Aktualisierung (ab v0.5, alle 6 Stunden geprüft) | Nichts tun. Kommt der Punkt nicht wieder: Windows-Taste, „Planner-Ablage", Enter; Details in `%LOCALAPPDATA%\PlannerAblage\update.log` |
+| Die abgelegte Datei taucht im Projektordner im Explorer auf | Alte Version (bis 0.4) legte die Datei in den Projektordner der Team-Bibliothek | Rechtsklick auf den Punkt → Versionsnummer prüfen; unter 0.5: Befehl aus Schritt 2 ausführen. Die alte Datei im Projektordner darf gelöscht werden (die Anlage der alten Aufgabe zeigt dann ins Leere) |
 | Punkt ist da, Fenster zeigt aber nur „Formular wird geladen …" oder „Seite konnte nicht geladen werden" | Kein Internet oder github.io blockiert; Formular liegt auf GitHub Pages | Verbindung prüfen, Fenster schließen, Datei erneut ablegen |
 | „Die Microsoft Edge WebView2-Laufzeit fehlt" | WebView2 nicht installiert (sehr selten, kommt mit Office/Edge) | Samuel Mödl informieren |
 | Microsoft-Fenster: „Administratorgenehmigung erforderlich" | Der Tenant lässt keine eigene Zustimmung zu; der M365-Admin muss die App „Planner-Ablage" einmal freigeben | „Zur Anwendung zurückkehren" klicken, Fenster schließen, Samuel Mödl Bescheid geben – er holt die Freigabe ein. Danach klappt es ohne weiteres Zutun |
@@ -141,20 +152,28 @@ Bedienung des Punkts (kurz mitgeben):
 | „Zu diesem Plan ist kein Team bekannt" | Privater Plan ohne Team – dort gibt es keine Dateiablage | Anderen Plan wählen oder Aufgabe über den Planner-Knopf ohne Datei anlegen |
 | Kollegin/Kollege fehlt unter „Zuweisen an" | Nur interne Konten „Nachname, Vorname" werden gezeigt | Samuel Mödl informieren |
 
-Update: Rechtsklick auf den Punkt → **„Aktualisieren (neueste Version holen)"**. Das führt
-denselben Befehl wie bei der Installation aus; Einstellungen und Anmeldung bleiben erhalten.
-Das Formular selbst aktualisiert sich ohnehin automatisch, weil es online liegt.
+Update: Ab Version 0.5 prüft der Punkt 45 Sekunden nach dem Start und dann alle sechs
+Stunden, ob es eine neue Version gibt, und installiert sie selbst im Hintergrund (nicht,
+während ein Formular offen ist). Einstellungen und Anmeldung bleiben erhalten. Von Hand:
+Rechtsklick → **„Jetzt auf neue Version prüfen"** (fragt vor dem Update nach) oder
+**„Neu installieren / reparieren"**. Ältere Punkte (bis 0.4) einmal mit dem Befehl aus
+Schritt 2 nachziehen; danach läuft es von selbst. Abschalten geht per Rechtsklick →
+„Automatisch aktualisieren". Das Formular selbst aktualisiert sich ohnehin sofort, weil es
+online liegt.
 
 ## Hintergrund für Rückfragen
 
 - **Was wird installiert?** Nur im Benutzerprofil (`%LOCALAPPDATA%\PlannerAblage`): ein
   kleines Windows-Programm (der Punkt, Quelltext liegt bei und wird lokal übersetzt), drei
-  Microsoft-WebView2-Bibliotheken und eine Autostart-Verknüpfung im eigenen Startordner.
-  Keine Admin-Rechte, keine Registry-Änderungen außerhalb des Benutzers.
+  Microsoft-WebView2-Bibliotheken, ein Startmenü-Eintrag und bei der Erstinstallation eine
+  Autostart-Verknüpfung im eigenen Startordner. Keine Admin-Rechte, keine Registry-Änderungen
+  außerhalb des Benutzers. Updates holt der Punkt selbst von GitHub (nur Programmcode).
 - **Wo liegen die Daten?** Ausschließlich in Microsoft 365 der Firma: Die Datei geht direkt
-  vom PC in die SharePoint-Bibliothek des Jahres-Teams (dort, wo auch Planner selbst
-  Anlagen speichert), die Aufgabe nach Planner. Das Formular wird von GitHub Pages geladen
-  und enthält nur Programmcode; der Hosting-Server sieht nie Dateien oder Aufgaben.
+  vom PC in die SharePoint-Bibliothek „Websiteobjekte" der Team-Site des Jahres-Teams
+  (Ordner `Planner-Anlagen\<Projekt>`), die Aufgabe nach Planner. Diese Bibliothek gehört zum
+  Team wie die Projektdateien, wird aber nicht mit dem Explorer synchronisiert – deshalb bleibt
+  der Projektordner sauber. Zugriff haben alle Team-Mitglieder. Das Formular wird von GitHub
+  Pages geladen und enthält nur Programmcode; der Hosting-Server sieht nie Dateien oder Aufgaben.
 - **Was sieht Samuel Mödl?** Nichts. Es gibt keinen zentralen Server; jede Person arbeitet
   mit ihrem eigenen Microsoft-Konto.
 - **Original löschen?** Nein, nie. Es wird eine Kopie hochgeladen.

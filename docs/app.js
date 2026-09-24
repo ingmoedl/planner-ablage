@@ -1,14 +1,16 @@
 /* Planner-Ablage – Formular "Aufgabe in Planner" (ing Burghausen GmbH)
  * Läuft in der WebView2-Hülle (Drop-Punkt) oder eigenständig im Browser.
- * Legt die abgelegte Datei im SharePoint des Jahres-Teams ab (Projektordner des Plans) und
- * erstellt die Planner-Aufgabe mit der Datei als Anlage (Referenz). Auth: MSAL.js, Redirect-Flow.
+ * Legt die abgelegte Datei in der Anlagen-Bibliothek („Websiteobjekte") des Jahres-Teams ab – NICHT im
+ * Projektordner, der bei allen im Explorer synchronisiert ist – und erstellt die Planner-Aufgabe mit der
+ * Datei als Anlage (Referenz). Auth: MSAL.js, Redirect-Flow.
  * Abgeleitet vom Planner-Knopf v2.1 (Outlook-Add-in); Plan-, Bucket- und Personenlogik identisch.
- * v0.1: erster Stand. */
+ * v0.1: erster Stand. v0.2: drei Termine, Anlagen-Vorschau.
+ * v0.5: Ablageort Websiteobjekte/Planner-Anlagen/<Plan> statt Projektordner. */
 
 "use strict";
 
 const CONFIG = {
-  version: "0.2",
+  version: "0.5",
   // App-Registrierung "Planner-Ablage" (eigene App, NICHT der Planner-Knopf), angelegt 18.09.2026.
   // ?client=<id>&scopes=knopf erlaubt Zwischentests mit einer anderen App.
   clientId: "239b6012-5d61-4e37-9041-75b0218e6a09",
@@ -16,13 +18,13 @@ const CONFIG = {
   scopes: ["User.Read", "User.ReadBasic.All", "Tasks.ReadWrite", "Files.ReadWrite.All"],
   graph: "https://graph.microsoft.com/v1.0",
   plannerWeb: "https://planner.cloud.microsoft/webui/plan/",
-  uploadSubfolder: "",            // "" = direkt in den Projektordner; z. B. "01 Kom" für einen Unterordner
+  uploadRootFolder: "Planner-Anlagen",  // Ordner in der Anlagen-Bibliothek (Websiteobjekte) des Jahres-Teams
   smallUploadLimit: 4 * 1024 * 1024,
   chunkSize: 5 * 1024 * 1024,     // Vielfaches von 320 KiB
   planCacheKey: "pa_plans_v1",
   peopleCacheKey: "pa_people_v1",
   bucketCachePrefix: "pa_buckets_v1_",
-  folderCachePrefix: "pa_folders_v1_",
+  targetCachePrefix: "pa_target_v1_",
   lastBucketPrefix: "pa_lastbucket_",
   cacheTtlMs: 6 * 60 * 60 * 1000,
   internalDomain: "ing-burghausen.de",
@@ -50,6 +52,8 @@ const el = (id) => document.getElementById(id);
 async function boot() {
   try {
     applyQueryOverrides();
+    // Cache-Reste der alten Projektordner-Ablage (bis v0.4) entfernen
+    try { Object.keys(localStorage).filter((k) => k.startsWith("pa_folders_v1_")).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
     canUpload = CONFIG.scopes.some((s) => /^(Files|Sites)\.ReadWrite/.test(s));
     wireUi();
     wireHost();
@@ -549,44 +553,83 @@ function wireUi() {
   });
 }
 
-/* ---------- Upload in den Projektordner des Jahres-Teams ---------- */
+/* ---------- Upload in die Anlagen-Bibliothek des Jahres-Teams ----------
+ * Die Datei darf NICHT im Projektordner der Team-Bibliothek „Freigegebene Dokumente" landen – die ist bei
+ * allen per OneDrive im Explorer synchronisiert, und die Anlage tauchte dort als Datei auf (bis v0.4).
+ * Stattdessen: Bibliothek „Websiteobjekte" (SiteAssets) derselben Team-Site. Jedes Team hat sie (dort liegt
+ * z. B. das OneNote-Notizbuch), alle Team-Mitglieder dürfen dort schreiben, niemand synchronisiert sie.
+ * Ordner: Planner-Anlagen/<Plantitel>/. Die Aufgabe bekommt den Link als Anlage (Referenz).
+ * Notbehelf ohne Websiteobjekte: Standardbibliothek, Ordner _Planner-Anlagen (ebenfalls nicht im Projektordner). */
 
 function projectNumber(title) {
   const m = /^(\d{5}(?:-[A-Za-z0-9]{1,6})?)/.exec(title || "");
   return m ? m[1].toUpperCase() : "";
 }
 
-/* Ordner der Team-Bibliothek, der zum Plan gehört (Name beginnt mit der Projektnummer bzw. = Plantitel). */
-async function findProjectFolder(groupId, planTitle) {
-  const key = CONFIG.folderCachePrefix + groupId;
-  let list = null;
+/* Plantitel → gültiger SharePoint-Ordnername */
+function folderName(title) {
+  let s = (title || "").replace(/[\\/:*?"<>|#%]/g, "_").replace(/\s+/g, " ").trim().replace(/[. ]+$/, "");
+  if (s.length > 120) s = s.slice(0, 120).trim();
+  return s || projectNumber(title) || "Ohne Plan";
+}
+
+/* Ziel-Bibliothek der Gruppe (6 h gecacht): {driveId, root, kind: "assets" | "library", name} */
+async function resolveTarget(groupId) {
+  const key = CONFIG.targetCachePrefix + groupId;
   try {
-    const cached = JSON.parse(localStorage.getItem(key) || "null");
-    if (cached && Array.isArray(cached.folders) && Date.now() - cached.ts < CONFIG.cacheTtlMs) list = cached.folders;
+    const c = JSON.parse(localStorage.getItem(key) || "null");
+    if (c && c.driveId && Date.now() - c.ts < CONFIG.cacheTtlMs) return c;
   } catch (_) {}
-  if (!list) {
-    const items = await graphAll("/groups/" + groupId + "/drive/root/children?$select=id,name,folder&$top=999");
-    list = items.filter((i) => i.folder).map((i) => ({ id: i.id, name: i.name }));
-    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), folders: list }));
+  const isAssets = (d) => /\/SiteAssets\/?$/i.test(d.webUrl || "");
+  let drives = [];
+  try { drives = await graphAll("/groups/" + groupId + "/drives?$select=id,name,webUrl"); }
+  catch (e) { diag("Bibliotheken der Gruppe nicht lesbar: " + msg(e)); }
+  let assets = drives.find(isAssets);
+  if (!assets) {
+    // Zweiter Weg über die Team-Site
+    try {
+      const siteRes = await graph("/groups/" + groupId + "/sites/root?$select=id");
+      if (siteRes.ok) {
+        const site = await siteRes.json();
+        drives = await graphAll("/sites/" + site.id + "/drives?$select=id,name,webUrl");
+        assets = drives.find(isAssets);
+      } else diag("Team-Site nicht lesbar: Graph " + siteRes.status);
+    } catch (e) { diag("Team-Site: " + msg(e)); }
   }
-  const num = projectNumber(planTitle);
-  const up = (planTitle || "").trim().toUpperCase();
-  let hit = list.find((f) => f.name.trim().toUpperCase() === up);
-  if (!hit && num) {
-    const hits = list.filter((f) => f.name.toUpperCase().startsWith(num));
-    if (hits.length === 1) hit = hits[0];
-    else if (hits.length > 1) hit = hits.find((f) => /^\d{5}(-[A-Za-z0-9]{1,6})?[\s_-]/.test(f.name.toUpperCase()) && f.name.toUpperCase().startsWith(num + " ")) || hits[0];
+  let target;
+  if (assets) {
+    target = { ts: Date.now(), driveId: assets.id, root: CONFIG.uploadRootFolder, kind: "assets", name: assets.name || "Websiteobjekte" };
+  } else {
+    const def = await graph("/groups/" + groupId + "/drive?$select=id,name");
+    if (!def.ok) throw new Error("Die Dateiablage des Teams ist nicht erreichbar (Graph " + def.status + ").");
+    const d = await def.json();
+    target = { ts: Date.now(), driveId: d.id, root: "_" + CONFIG.uploadRootFolder, kind: "library", name: d.name || "Dokumente" };
+    diag("Keine Websiteobjekte-Bibliothek gefunden – Notbehelf: " + target.name + "/" + target.root);
   }
-  return hit || null;
+  localStorage.setItem(key, JSON.stringify(target));
+  return target;
 }
 
 function encodePath(path) { return path.split("/").filter(Boolean).map(encodeURIComponent).join("/"); }
 
-async function uploadFile(groupId, folderPath, file, onProgress) {
+/* Ordnerkette anlegen (existiert schon → 409, egal). */
+async function ensureFolder(driveId, folder) {
+  let parent = "";
+  for (const part of folder.split("/").filter(Boolean)) {
+    const url = "/drives/" + driveId + "/root" + (parent ? ":/" + encodePath(parent) + ":" : "") + "/children";
+    const res = await graph(url, { method: "POST", body: JSON.stringify({ name: part, folder: {}, "@microsoft.graph.conflictBehavior": "fail" }) });
+    if (!res.ok && res.status !== 409) throw new Error(await uploadError(res, "Ordner '" + part + "'"));
+    parent = parent ? parent + "/" + part : part;
+  }
+}
+
+async function uploadFile(target, folder, file, onProgress) {
   const blob = await fileBlob(file);
-  const base = "/groups/" + groupId + "/drive/root:/" + (folderPath ? encodePath(folderPath) + "/" : "") + encodeURIComponent(file.name);
+  const base = "/drives/" + target.driveId + "/root:/" + encodePath(folder) + "/" + encodeURIComponent(file.name);
   if (blob.size <= CONFIG.smallUploadLimit) {
-    const res = await graph(base + ":/content?@microsoft.graph.conflictBehavior=rename", { method: "PUT", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
+    const put = () => graph(base + ":/content?@microsoft.graph.conflictBehavior=rename", { method: "PUT", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
+    let res = await put();
+    if (res.status === 404) { await ensureFolder(target.driveId, folder); res = await put(); }
     if (!res.ok) throw new Error(await uploadError(res, file.name));
     onProgress(1);
     const item = await res.json();
@@ -594,7 +637,9 @@ async function uploadFile(groupId, folderPath, file, onProgress) {
     return item;
   }
   // Große Datei: Upload-Session in Blöcken
-  const sess = await graph(base + ":/createUploadSession", { method: "POST", body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "rename", name: file.name } }) });
+  const open = () => graph(base + ":/createUploadSession", { method: "POST", body: JSON.stringify({ item: { "@microsoft.graph.conflictBehavior": "rename", name: file.name } }) });
+  let sess = await open();
+  if (sess.status === 404) { await ensureFolder(target.driveId, folder); sess = await open(); }
   if (!sess.ok) throw new Error(await uploadError(sess, file.name));
   const uploadUrl = (await sess.json()).uploadUrl;
   let pos = 0, result = null;
@@ -612,6 +657,7 @@ async function uploadFile(groupId, folderPath, file, onProgress) {
     onProgress(pos / blob.size);
     if (res.status === 200 || res.status === 201) result = await res.json();
   }
+  diag("Upload ok (Session): " + (result && result.name) + " → " + (result && result.webUrl));
   return result;
 }
 
@@ -619,7 +665,7 @@ async function uploadError(res, name) {
   let detail = "";
   try { const j = await res.json(); detail = (j.error && j.error.message) || ""; } catch (_) {}
   if (res.status === 403) return "Keine Berechtigung, '" + name + "' im Team dieses Projekts abzulegen. Bist du Mitglied im Jahres-Team?";
-  if (res.status === 404) return "Die Dateiablage des Teams wurde nicht gefunden (Graph 404). " + detail;
+  if (res.status === 404) return "Die Anlagen-Bibliothek des Teams wurde nicht gefunden (Graph 404). " + detail;
   return "Upload von '" + name + "' fehlgeschlagen (Graph " + res.status + "). " + detail;
 }
 
@@ -672,17 +718,17 @@ async function createTask() {
     // 1) Dateien hochladen (vor der Aufgabe, damit bei Upload-Fehlern keine halbe Aufgabe entsteht)
     const uploaded = [];   // [{name, webUrl}]
     const skipped = [];    // Dateinamen ohne Upload (Testmodus / kein Team)
+    let target = null;
     if (files.length && canUpload) {
       if (!selectedPlan.owner) throw new Error("Zu diesem Plan ist kein Team bekannt – Datei kann nicht abgelegt werden.");
-      showStatus("Ablageordner wird gesucht …", "");
-      const folder = await findProjectFolder(selectedPlan.owner, selectedPlan.title);
-      let folderPath = folder ? folder.name : "";
-      diag("Plan " + selectedPlan.title + " | Gruppe " + selectedPlan.owner + " | Ordner " + (folderPath || "(Wurzel)"));
-      if (CONFIG.uploadSubfolder) folderPath = (folderPath ? folderPath + "/" : "") + CONFIG.uploadSubfolder;
+      showStatus("Anlagen-Bibliothek des Teams wird gesucht …", "");
+      target = await resolveTarget(selectedPlan.owner);
+      const folder = target.root + "/" + folderName(selectedPlan.title);
+      diag("Plan " + selectedPlan.title + " | Gruppe " + selectedPlan.owner + " | Ziel " + target.kind + " (" + target.name + ") /" + folder);
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
-        showStatus("Datei " + (i + 1) + " von " + files.length + " wird abgelegt: " + esc(f.name) + " …", "");
-        const item = await uploadFile(selectedPlan.owner, folderPath, f, (p) => setBar((i + p) / files.length));
+        showStatus("Datei " + (i + 1) + " von " + files.length + " wird als Anlage abgelegt: " + esc(f.name) + " …", "");
+        const item = await uploadFile(target, folder, f, (p) => setBar((i + p) / files.length));
         uploaded.push({ name: (item && item.name) || f.name, webUrl: (item && item.webUrl) || "" });
       }
     } else if (files.length) {
@@ -719,7 +765,12 @@ async function createTask() {
     const bucketName = bucketId ? (buckets.find((b) => b.id === bucketId) || {}).name : "";
     const link = CONFIG.plannerWeb + planId + "/view/board/task/" + task.id;
     let html = '✓ Aufgabe angelegt in „' + esc(selectedPlan.title) + '"' + (bucketName ? " → Bucket „" + esc(bucketName) + '"' : "") + ".";
-    if (refs.length && !detailsError) html += "<br>" + refs.length + (refs.length === 1 ? " Datei" : " Dateien") + " im Team abgelegt und angehängt.";
+    if (refs.length && !detailsError) {
+      html += "<br>" + refs.length + (refs.length === 1 ? " Datei" : " Dateien") + " als Anlage angehängt";
+      html += (target && target.kind === "library")
+        ? " (Notbehelf: Team-Dateien, Ordner " + esc(target.root) + ")."
+        : " – gespeichert in der Anlagen-Bibliothek des Teams, nicht im Projektordner.";
+    }
     if (detailsError) html += '<br><span style="color:var(--err)">⚠ ' + esc(detailsError) + "</span>";
     if (skipped.length) html += "<br>Ohne Upload (Testmodus): " + esc(skipped.join(", "));
     html += '<br><a href="' + link + '" target="_blank" rel="noopener">In Planner öffnen</a>';
