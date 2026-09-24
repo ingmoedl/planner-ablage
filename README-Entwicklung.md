@@ -181,8 +181,12 @@ Nutzerwünsche 24.09.: (1) Befehl für die aktuelle Version, (2) der Punkt soll 
 4. Echttests: ✅ Anmeldung, 623 Pläne, Upload, Referenz auf der Karte (21.09.). Offen: Upload groß (>4 MB
    per Session in Websiteobjekte), Drag aus klassischem Outlook (virtuelle .msg), Drag aus neuem Outlook.
 5. ✅ Skill „planner-ablage-installation" (v0.5 angepasst).
-6. Offen: Bestätigung des Nutzers, dass mit v0.5 keine Datei mehr im Projektordner erscheint und die
-   Karte die Anlage weiter mit Vorschau zeigt; erster automatischer Update-Lauf im Feld (update.log).
+6. ✅ Live-Test 24.09.2026 (Browser-Pane, Nutzerkonto, produktiver `createTask`-Pfad): Aufgabe in Plan 25542-02
+   angelegt, PNG-Anlage lag unter `…/sites/2025/SiteAssets/Planner-Anlagen/25542-02 BYN P2480 P2401H HyPipe/`,
+   `previewType: reference`, Board-Karte zeigt Bildvorschau + Dateiname, Aufgabenreiter „Anlagen (1)" mit
+   SharePoint-Link. Testaufgabe, Datei und Planordner danach per Graph gelöscht (Wurzelordner `Planner-Anlagen`
+   bleibt leer stehen). Offen: Bestätigung des Nutzers aus dem Alltag, erster automatischer Update-Lauf im Feld
+   (update.log), Kollegen ≤ v0.4 einmal mit dem irm-Befehl nachziehen.
 
 ## Fallen
 - csc 4.8 = C# 5: kein `$"…"`, kein `?.`, kein `nameof`, keine Expression-Bodies.
