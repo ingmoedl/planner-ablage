@@ -942,9 +942,10 @@ namespace PlannerAblage
                 var shellType = Type.GetTypeFromProgID("WScript.Shell");
                 object shell = Activator.CreateInstance(shellType);
                 object link = shellType.InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, shell, new object[] { linkPath });
-                return Convert.ToString(link.GetType().InvokeMember("TargetPath", System.Reflection.BindingFlags.GetProperty, null, link, null));
+                // leeres Argument-Array statt null: mit null schlug der IDispatch-Aufruf fehl → "" → Verknüpfung wurde bei jedem Start neu geschrieben
+                return Convert.ToString(link.GetType().InvokeMember("TargetPath", System.Reflection.BindingFlags.GetProperty, null, link, new object[0]));
             }
-            catch (Exception) { return ""; }
+            catch (Exception e) { App.Log("Verknüpfung lesen: " + e.Message); return ""; }
         }
     }
 
@@ -1136,10 +1137,14 @@ namespace PlannerAblage
                 string log = Path.Combine(App.LocalDir, "update.log");
                 string cmd = "$env:PA_AUTO='" + (silent ? "1" : "0") + "'; irm '" + App.RepoRaw + "install.ps1?t=" + DateTime.UtcNow.Ticks + "' | iex";
                 if (silent) cmd = "& { " + cmd + " } *> '" + log + "'";
+                // Direkt per CreateProcess starten (kein ShellExecute): ShellExecute mit verstecktem Fenster lieferte
+                // im Feldtest 24.09.2026 „Zugriff verweigert".
                 var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass " + (silent ? "-WindowStyle Hidden " : "") + "-Command \"" + cmd + "\"");
-                psi.UseShellExecute = true;
-                if (silent) psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi.UseShellExecute = false;
+                psi.CreateNoWindow = silent;
+                psi.WorkingDirectory = App.LocalDir;
                 Process.Start(psi);
+                App.Log("Update-Skript gestartet (" + (silent ? "still" : "sichtbar") + ")");
             }
             catch (Exception ex)
             {

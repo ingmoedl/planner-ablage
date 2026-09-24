@@ -203,6 +203,13 @@ Ein Kollege (Mathias) hat den Code mit Claude durchgesehen; die Punkte und ihr S
 7. ✅ **Temporäre Kopien**: `App.CleanupDrop()` löscht beim Start alle `drop\<guid>`-Ordner (beim Start ist kein
    Formular offen).
 - Installer: `Unblock-File` nur noch für `*.dll` (install.ps1, Installieren.cmd).
+- **Feldtest der Selbst-Aktualisierung (v0.5 → v0.6, 24.09. 12:16):** Erkennung lief („Automatische Aktualisierung
+  v0.5 → v0.6"), aber `Process.Start(powershell)` mit `UseShellExecute = true` + `WindowStyle Hidden` scheiterte mit
+  „Zugriff verweigert". Fix: `UseShellExecute = false`, `CreateNoWindow` im stillen Fall, `WorkingDirectory`
+  = LocalDir. (Der Punkt war dabei als Kindprozess der Claude-Werkzeugumgebung gestartet; ob ein normal
+  gestarteter v0.5-Punkt denselben Fehler hätte, ist offen – v0.5 lief nur auf dem PC des Nutzers.)
+- `Shortcuts.Target()` lieferte immer "" (IDispatch-GetProperty mit `null`-Argumenten) → Start- und Autostart-
+  Verknüpfung wurden bei jedem Start neu geschrieben und protokolliert. Fix: `new object[0]`.
 - Auto-Update ohne Signatur: bewusst so belassen – eine Signaturprüfung mit Schlüssel im selben Repo brächte nichts;
   ein getrennter Signierschlüssel wäre der nächste Schritt, falls die Geschäftsführung das verlangt.
 
