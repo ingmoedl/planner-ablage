@@ -151,12 +151,14 @@ Nutzerwünsche 24.09.: (1) Befehl für die aktuelle Version, (2) der Punkt soll 
   neuen Stand als *Unterordner* `App\planner-ablage-main` ab und explorer.exe startete die alte exe. Deshalb:
   nie den bisherigen Programmordner umbenennen, immer in einen frischen Ordner installieren und das Ergebnis
   prüfen. `Autostart.Ensure()` in der Hülle biegt eine Verknüpfung auf den aktuellen Pfad um.
-  **Falle 2 (24.09.):** `explorer.exe "<exe>"` als Startweg zeigte beim Nutzer zweimal den Dialog „Der angegebene
-  Pfad ist nicht vorhanden" (Pfade `App.alt\bin\…` und `App-0.5\bin\…`, beide existierten); der Punkt kam nur
-  über den Fallback-Direktstart. Aufgetreten aus der Claude-Werkzeugumgebung heraus, Ursache nicht abschließend
-  geklärt (Verdacht: Punkt im Ordnernamen oder Aufrufkontext). Seitdem startet install.ps1 den Punkt **direkt**,
-  wenn PowerShell nicht erhöht ist, und nimmt explorer.exe nur noch im Administrator-Fall (Direktstart als
-  Fallback; die Hülle de-eleviert sich dann selbst).
+  **Falle 2 (24.09.), aufgeklärt:** Alle Merkwürdigkeiten des Tages aus der Claude-Werkzeugumgebung heraus
+  (Explorer „Pfad nicht vorhanden", Aufgabenplanung 0x80070002, ShellExecute „Zugriff verweigert", wirkungslose
+  Umbenennung) hatten eine Ursache: Die Claude-Desktop-App ist ein MSIX-Paket, ihre Kindprozesse schreiben unter
+  `%LOCALAPPDATA%`/`%TEMP%` **virtualisiert** nach `…\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\`.
+  Der „installierte" Ordner `App-0.5` existierte nur dort; Explorer, Aufgabenplanung und Autostart sehen ihn nicht.
+  Folge: Installationen für den echten PC muss der Nutzer selbst in seiner PowerShell ausführen; Claude-Läufe von
+  install.ps1 sind nur Logiktests. Die Änderungen (Direktstart statt explorer.exe, CreateProcess statt
+  ShellExecute, Versionsordner statt Umbenennen) bleiben trotzdem – sie sind robuster.
 - **Startmenü** (`StartMenu.Ensure()` beim Start, install.ps1, Installieren.cmd):
   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Planner-Ablage.lnk` → „Windows-Taste, Planner tippen,
   Enter" findet den Punkt immer, auch ohne Autostart. Wird neu angelegt, wenn er fehlt oder auf eine andere
@@ -206,8 +208,9 @@ Ein Kollege (Mathias) hat den Code mit Claude durchgesehen; die Punkte und ihr S
 - **Feldtest der Selbst-Aktualisierung (v0.5 → v0.6, 24.09. 12:16):** Erkennung lief („Automatische Aktualisierung
   v0.5 → v0.6"), aber `Process.Start(powershell)` mit `UseShellExecute = true` + `WindowStyle Hidden` scheiterte mit
   „Zugriff verweigert". Fix: `UseShellExecute = false`, `CreateNoWindow` im stillen Fall, `WorkingDirectory`
-  = LocalDir. (Der Punkt war dabei als Kindprozess der Claude-Werkzeugumgebung gestartet; ob ein normal
-  gestarteter v0.5-Punkt denselben Fehler hätte, ist offen – v0.5 lief nur auf dem PC des Nutzers.)
+  = LocalDir. (Der Punkt lief dabei MSIX-virtualisiert als Kindprozess der Claude-App – der Fehler war sehr
+  wahrscheinlich ein Sandbox-Artefakt. Der Auto-Update-Pfad ist im echten Kontext noch NICHT beobachtet: beim
+  nächsten Release `%LOCALAPPDATA%\PlannerAblage\log.txt` und `update.log` auf dem Nutzer-PC prüfen.)
 - `Shortcuts.Target()` lieferte immer "" (IDispatch-GetProperty mit `null`-Argumenten) → Start- und Autostart-
   Verknüpfung wurden bei jedem Start neu geschrieben und protokolliert. Fix: `new object[0]`.
 - Auto-Update ohne Signatur: bewusst so belassen – eine Signaturprüfung mit Schlüssel im selben Repo brächte nichts;
