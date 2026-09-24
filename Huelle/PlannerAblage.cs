@@ -42,7 +42,7 @@ namespace PlannerAblage
         public const string DefaultPageUrl = "https://ingmoedl.github.io/planner-ablage/index.html";
         public static readonly string DataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PlannerAblage");
         public static readonly string LocalDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PlannerAblage");
-        /* Programmordner (…\App): eine Ebene über bin\, dort liegen VERSION, install.ps1, Huelle\ … */
+        /* Programmordner (…\App-<Version>): eine Ebene über bin\, dort liegen VERSION, install.ps1, Huelle\ … */
         public static readonly string AppDir = Path.GetDirectoryName(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
         public static Settings Cfg;
 
@@ -73,7 +73,8 @@ namespace PlannerAblage
                 Cfg = Settings.Load();
                 Log("Start v" + Updater.LocalVersion() + "  " + Application.ExecutablePath);
                 if (firstRun && !Autostart.IsEnabled()) Autostart.Set(true); // ab dem ersten Start mit Windows starten
-                StartMenu.Ensure(); // „Windows-Taste → Planner" findet den Punkt immer, auch wenn der Autostart aus ist
+                Autostart.Ensure();  // zeigt die Verknüpfung noch auf einen alten Versionsordner → umstellen
+                StartMenu.Ensure();  // „Windows-Taste → Planner" findet den Punkt immer, auch wenn der Autostart aus ist
                 Application.ThreadException += delegate(object s, ThreadExceptionEventArgs e)
                 {
                     MessageBox.Show("Unerwarteter Fehler:\n\n" + e.Exception.Message, "Planner-Ablage", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -862,6 +863,19 @@ namespace PlannerAblage
         }
 
         public static bool IsEnabled() { return File.Exists(LinkPath); }
+
+        /* Nach einem Update liegt die exe in einem neuen Versionsordner → bestehende Verknüpfung nachziehen. */
+        public static void Ensure()
+        {
+            try
+            {
+                if (!File.Exists(LinkPath)) return;
+                if (string.Equals(Shortcuts.Target(LinkPath), Application.ExecutablePath, StringComparison.OrdinalIgnoreCase)) return;
+                Shortcuts.Create(LinkPath);
+                App.Log("Autostart-Verknüpfung auf " + Application.ExecutablePath + " umgestellt");
+            }
+            catch (Exception e) { App.Log("Autostart prüfen: " + e.Message); }
+        }
 
         public static void Set(bool on)
         {

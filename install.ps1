@@ -1,7 +1,9 @@
 # Planner-Ablage – Installation / Aktualisierung mit einem Befehl (kein Admin nötig)
 #   irm https://raw.githubusercontent.com/ingmoedl/planner-ablage/main/install.ps1 | iex
-# Lädt den aktuellen Stand von GitHub, übersetzt die Hülle lokal, legt ihn nach %LOCALAPPDATA%\PlannerAblage\App,
-# richtet den Startmenü-Eintrag (und bei der Erstinstallation den Autostart) ein und startet den Punkt.
+# Lädt den aktuellen Stand von GitHub, übersetzt die Hülle lokal und legt sie in einen NEUEN Versionsordner
+# %LOCALAPPDATA%\PlannerAblage\App-<Version>. Startmenü- (und ggf. Autostart-)Verknüpfung zeigen danach dorthin,
+# der Punkt wird gestartet, alte Versionsordner werden gelöscht (noch gesperrte beim nächsten Lauf).
+# Kein Umbenennen des laufenden Programmordners - das schlug direkt nach dem Beenden der exe schon einmal fehl.
 # Der laufende Punkt ruft dieses Skript auch selbst auf, wenn im Repo eine neuere VERSION liegt
 # ($env:PA_AUTO = '1': still, ohne Fenster, Autostart-Einstellung bleibt unverändert).
 
@@ -9,12 +11,13 @@ $ErrorActionPreference = "Stop"
 $auto    = ($env:PA_AUTO -eq "1")
 $zipUrl  = "https://github.com/ingmoedl/planner-ablage/archive/refs/heads/main.zip"
 $root    = Join-Path $env:LOCALAPPDATA "PlannerAblage"
-$appDir  = Join-Path $root "App"
-$oldDir  = Join-Path $root "App.alt"
 $stamp   = [guid]::NewGuid().ToString("N")
 $tmpZip  = Join-Path $env:TEMP ("planner-ablage-" + $stamp + ".zip")
 $tmpDir  = Join-Path $env:TEMP ("planner-ablage-" + $stamp)
 $fresh   = -not (Test-Path (Join-Path $env:APPDATA "PlannerAblage\settings.json"))
+$menuLnk    = Join-Path ([Environment]::GetFolderPath("Programs")) "Planner-Ablage.lnk"
+$startupLnk = Join-Path ([Environment]::GetFolderPath("Startup")) "Planner-Ablage.lnk"
+$hadAutostart = Test-Path $startupLnk
 
 function Write-PaLine($text, $color = "Gray") { Write-Host $text -ForegroundColor $color }
 
@@ -52,7 +55,8 @@ $src = Get-ChildItem $tmpDir -Directory | Select-Object -First 1
 if (-not $src) { throw "Das heruntergeladene Archiv war leer." }
 Get-ChildItem $src.FullName -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 $newVersion = (Get-Content (Join-Path $src.FullName "VERSION") -ErrorAction SilentlyContinue | Select-Object -First 1)
-if (-not $newVersion) { $newVersion = "?" }
+if (-not $newVersion) { Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue; throw "Im Archiv fehlt die Datei VERSION." }
+$newVersion = $newVersion.Trim()
 
 # 2) Übersetzen - noch im Temp-Ordner. Schlägt das fehl, bleibt die installierte Version unverändert.
 Write-PaLine "  2/4  Übersetzen (Version $newVersion) ..."
@@ -65,36 +69,33 @@ if ($code -ne 0 -or -not (Test-Path (Join-Path $src.FullName "bin\PlannerAblage.
   throw "Übersetzen fehlgeschlagen (Code $code). Die bisherige Version bleibt installiert."
 }
 
-# 3) Laufenden Punkt beenden und Programmordner tauschen
+# 3) Laufenden Punkt beenden, neuen Versionsordner einsetzen
 #    (Einstellungen liegen in %APPDATA%, die Anmeldung im WebView2-Profil - beides bleibt)
 Write-PaLine "  3/4  Dateien ablegen ..."
 Get-Process PlannerAblage -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 $t0 = Get-Date
 while ((Get-Process PlannerAblage -ErrorAction SilentlyContinue) -and ((Get-Date) - $t0).TotalSeconds -lt 10) { Start-Sleep -Milliseconds 200 }
-Start-Sleep -Milliseconds 400
 New-Item -ItemType Directory -Force $root | Out-Null
-if (Test-Path $oldDir) { Remove-Item $oldDir -Recurse -Force -ErrorAction SilentlyContinue }
-if (Test-Path $appDir) { Move-Item $appDir $oldDir }
-try {
-  Move-Item $src.FullName $appDir
-} catch {
-  # Tausch fehlgeschlagen: alten Stand zurück und wieder starten, damit der Punkt nicht verschwindet
-  if ((Test-Path $oldDir) -and -not (Test-Path $appDir)) { Move-Item $oldDir $appDir }
-  $oldExe = Join-Path $appDir "bin\PlannerAblage.exe"
-  if (Test-Path $oldExe) { Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + $oldExe + '"') }
-  throw
+$appDir = Join-Path $root ("App-" + $newVersion)
+if (Test-Path $appDir) {
+  # Gleiche Version schon vorhanden (Reparatur): weg damit; ist sie gesperrt, eigenen Ordner nehmen
+  try { Remove-Item -LiteralPath $appDir -Recurse -Force -ErrorAction Stop }
+  catch { $appDir = Join-Path $root ("App-" + $newVersion + "-" + $stamp.Substring(0, 8)) }
 }
-Remove-Item $oldDir -Recurse -Force -ErrorAction SilentlyContinue
+Move-Item -LiteralPath $src.FullName -Destination $appDir
+$exe = Join-Path $appDir "bin\PlannerAblage.exe"
+if (-not (Test-Path (Join-Path $appDir "VERSION")) -or -not (Test-Path $exe)) {
+  Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+  throw "Der neue Programmordner $appDir ist unvollständig. Bitte den Befehl erneut ausführen."
+}
 Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 
-# 4) Verknüpfungen und Start
+# 4) Verknüpfungen, Start, Aufräumen
 Write-PaLine "  4/4  Einrichten ..."
-$exe = Join-Path $appDir "bin\PlannerAblage.exe"
 # Startmenü: Windows-Taste, "Planner-Ablage" tippen, Enter - funktioniert auch ohne Autostart
-New-PaShortcut (Join-Path ([Environment]::GetFolderPath("Programs")) "Planner-Ablage.lnk") $exe
-# Autostart nur bei der Erstinstallation setzen; später entscheidet der Nutzer (Rechtsklick -> "Mit Windows starten")
-$startupLnk = Join-Path ([Environment]::GetFolderPath("Startup")) "Planner-Ablage.lnk"
-if ($fresh) { New-PaShortcut $startupLnk $exe }
+New-PaShortcut $menuLnk $exe
+# Autostart: bei Erstinstallation einschalten; war er an, auf den neuen Ordner umbiegen; war er aus, bleibt er aus
+if ($fresh -or $hadAutostart) { New-PaShortcut $startupLnk $exe }
 $autostart = Test-Path $startupLnk
 
 # Punkt starten - losgelöst von diesem Fenster. Über explorer.exe läuft er immer mit normalen Benutzerrechten,
@@ -104,6 +105,11 @@ Start-Sleep -Seconds 3
 if (-not (Get-Process PlannerAblage -ErrorAction SilentlyContinue)) {
   Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe)
 }
+
+# Alte Versionsordner (App, App.alt, App-0.4 ...) entfernen; noch gesperrte bleiben bis zum nächsten Lauf liegen
+Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like "App*" -and $_.FullName -ne $appDir } |
+  ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
 Write-PaLine ""
 Write-PaLine "  Fertig. Planner-Ablage v$newVersion läuft - der grüne Punkt ist unten rechts auf dem Hauptbildschirm." "Green"

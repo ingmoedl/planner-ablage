@@ -105,8 +105,8 @@ dem Punkt, zwei Testdateien kommen in der Seite an (Titel und Größe stimmen), 
   (kompiliert, Autostart, Start). Rechtsklick-Menü „Aktualisieren" ruft denselben Befehl.
   Falle: nicht `Start-Process -Wait` verwenden, das wartet auch auf den gestarteten Punkt.
 - Skill `skill/planner-ablage-installation` (+ .skill-Paket) für Kollegen.
-- Der Nutzer-PC läuft jetzt aus `%LOCALAPPDATA%\PlannerAblage\Appin`; der Dev-Ordner `bin\`
-  ist nur noch für Tests (`Start.cmd /build`).
+- Der Nutzer-PC läuft aus `%LOCALAPPDATA%\PlannerAblage\App-<Version>in` (bis v0.4: `Appin`); der
+  Dev-Ordner `bin\` ist nur noch für Tests (`Start.cmd /build`).
 
 ## v0.4 (21.09.2026)
 - **Kollegen-PC: Drop auf den Punkt zeigte rotes Verbotszeichen**, Drop ins Formular ging. Ursache sehr
@@ -137,10 +137,17 @@ Nutzerwünsche 24.09.: (1) Befehl für die aktuelle Version, (2) der Punkt soll 
   „Automatisch aktualisieren", Standard an). Menü außerdem: „Jetzt auf neue Version prüfen" (Rückfrage vor
   dem Update), „Neu installieren / reparieren" (install.ps1 sichtbar).
 - **install.ps1 neu geordnet**: 1) ZIP laden + entpacken, 2) **im Temp-Ordner übersetzen** (`Start.cmd
-  /buildonly`; scheitert das, bleibt die alte Version unangetastet), 3) Punkt beenden, `App` → `App.alt`,
-  Temp → `App` (bei Fehler zurück und alten Punkt starten), 4) Startmenü-Verknüpfung immer, Autostart nur
-  bei Erstinstallation (`$fresh` = keine settings.json), Start über explorer.exe. `$env:PA_AUTO='1'`
-  unterdrückt nur den WebView2-Hinweis; die Ausgabe landet beim stillen Lauf in update.log.
+  /buildonly`; scheitert das, bleibt die alte Version unangetastet), 3) Punkt beenden, Temp →
+  **neuer Versionsordner `%LOCALAPPDATA%\PlannerAblage\App-<Version>`** (Prüfung: VERSION + exe vorhanden),
+  4) Startmenü-Verknüpfung immer, Autostart bei Erstinstallation neu bzw. auf den neuen Ordner umgebogen, wenn
+  er an war (`$hadAutostart`), Start über explorer.exe, danach alle anderen `App*`-Ordner löschen (gesperrte
+  beim nächsten Lauf). `$env:PA_AUTO='1'` unterdrückt nur den WebView2-Hinweis; die Ausgabe landet beim
+  stillen Lauf in update.log.
+  **Falle (24.09.):** die erste Fassung benannte `App` → `App.alt` um und verschob Temp nach `App`. Direkt nach
+  `Stop-Process` blieb die Umbenennung ohne Fehlermeldung wirkungslos (exe noch gesperrt), Move-Item legte den
+  neuen Stand als *Unterordner* `App\planner-ablage-main` ab und explorer.exe startete die alte exe. Deshalb:
+  nie den bisherigen Programmordner umbenennen, immer in einen frischen Ordner installieren und das Ergebnis
+  prüfen. `Autostart.Ensure()` in der Hülle biegt eine Verknüpfung auf den aktuellen Pfad um.
 - **Startmenü** (`StartMenu.Ensure()` beim Start, install.ps1, Installieren.cmd):
   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Planner-Ablage.lnk` → „Windows-Taste, Planner tippen,
   Enter" findet den Punkt immer, auch ohne Autostart. Wird neu angelegt, wenn er fehlt oder auf eine andere

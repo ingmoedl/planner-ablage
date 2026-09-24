@@ -29,7 +29,7 @@ Punkt starten, wenn er nicht da ist
 -----------------------------------
 Windows-Taste druecken, "Planner-Ablage" tippen, Enter. (Der Punkt steht im Startmenue.)
 Soll er wieder automatisch mit Windows starten: Rechtsklick auf den Punkt -> "Mit Windows starten".
-Programmdatei: %LOCALAPPDATA%\PlannerAblage\App\bin\PlannerAblage.exe
+Programmdatei: %LOCALAPPDATA%\PlannerAblage\App-<Version>\bin\PlannerAblage.exe
 
 Bedienung
 ---------
