@@ -24,7 +24,7 @@ const CONFIG = {
   planCacheKey: "pa_plans_v1",
   peopleCacheKey: "pa_people_v1",
   bucketCachePrefix: "pa_buckets_v1_",
-  targetCachePrefix: "pa_target_v1_",
+  targetCachePrefix: "pa_target_v2_",
   lastBucketPrefix: "pa_lastbucket_",
   cacheTtlMs: 6 * 60 * 60 * 1000,
   internalDomain: "ing-burghausen.de",
@@ -53,7 +53,7 @@ async function boot() {
   try {
     applyQueryOverrides();
     // Cache-Reste der alten Projektordner-Ablage (bis v0.4) entfernen
-    try { Object.keys(localStorage).filter((k) => k.startsWith("pa_folders_v1_")).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
+    try { Object.keys(localStorage).filter((k) => k.startsWith("pa_folders_v1_") || k.startsWith("pa_target_v1_")).forEach((k) => localStorage.removeItem(k)); } catch (_) {}
     canUpload = CONFIG.scopes.some((s) => /^(Files|Sites)\.ReadWrite/.test(s));
     wireUi();
     wireHost();
@@ -573,31 +573,40 @@ function folderName(title) {
   return s || projectNumber(title) || "Ohne Plan";
 }
 
-/* Ziel-Bibliothek der Gruppe (6 h gecacht): {driveId, root, kind: "assets" | "library", name} */
+/* Ziel-Bibliothek der Gruppe (6 h gecacht): {driveId, root, kind: "assets" | "library", name}
+ * „Websiteobjekte" ist eine versteckte Systembibliothek: /drives und /lists führen sie NICHT auf (geprüft 24.09.2026).
+ * Erreichbar ist sie über die Team-Site per Listentitel (/sites/{id}/lists/Websiteobjekte) oder über die
+ * Listen-Auflistung mit $select=system; von der Liste aus liefert /drive die Drive-ID für den Upload. */
 async function resolveTarget(groupId) {
   const key = CONFIG.targetCachePrefix + groupId;
   try {
     const c = JSON.parse(localStorage.getItem(key) || "null");
     if (c && c.driveId && Date.now() - c.ts < CONFIG.cacheTtlMs) return c;
   } catch (_) {}
-  const isAssets = (d) => /\/SiteAssets\/?$/i.test(d.webUrl || "");
-  let drives = [];
-  try { drives = await graphAll("/groups/" + groupId + "/drives?$select=id,name,webUrl"); }
-  catch (e) { diag("Bibliotheken der Gruppe nicht lesbar: " + msg(e)); }
-  let assets = drives.find(isAssets);
-  if (!assets) {
-    // Zweiter Weg über die Team-Site
-    try {
-      const siteRes = await graph("/groups/" + groupId + "/sites/root?$select=id");
-      if (siteRes.ok) {
-        const site = await siteRes.json();
-        drives = await graphAll("/sites/" + site.id + "/drives?$select=id,name,webUrl");
-        assets = drives.find(isAssets);
-      } else diag("Team-Site nicht lesbar: Graph " + siteRes.status);
-    } catch (e) { diag("Team-Site: " + msg(e)); }
-  }
+  const isAssets = (l) => /\/SiteAssets\/?$/i.test(l.webUrl || "");
+  let assets = null;
+  try {
+    const siteRes = await graph("/groups/" + groupId + "/sites/root?$select=id");
+    if (!siteRes.ok) throw new Error("Graph " + siteRes.status);
+    const site = await siteRes.json();
+    let list = null;
+    for (const title of ["Websiteobjekte", "Site Assets"]) {
+      const res = await graph("/sites/" + site.id + "/lists/" + encodeURIComponent(title) + "?$select=id,displayName,webUrl");
+      if (res.ok) { const l = await res.json(); if (isAssets(l)) { list = l; break; } }
+    }
+    if (!list) {
+      // sprachunabhängig: alle Listen inkl. System-/versteckter Listen
+      try { list = (await graphAll("/sites/" + site.id + "/lists?$select=id,displayName,webUrl,system&$top=200")).find(isAssets) || null; }
+      catch (e) { diag("Listen der Team-Site: " + msg(e)); }
+    }
+    if (list) {
+      const drv = await graph("/sites/" + site.id + "/lists/" + list.id + "/drive?$select=id,name,webUrl");
+      if (drv.ok) assets = await drv.json();
+      else diag("Drive der Websiteobjekte nicht lesbar: Graph " + drv.status);
+    } else diag("Keine Websiteobjekte-Liste in der Team-Site gefunden");
+  } catch (e) { diag("Team-Site nicht lesbar: " + msg(e)); }
   let target;
-  if (assets) {
+  if (assets && assets.id) {
     target = { ts: Date.now(), driveId: assets.id, root: CONFIG.uploadRootFolder, kind: "assets", name: assets.name || "Websiteobjekte" };
   } else {
     const def = await graph("/groups/" + groupId + "/drive?$select=id,name");
